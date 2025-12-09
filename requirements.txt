@@ -3,4 +3,6 @@ feedparser
 flask
 requests
 beautifulsoup4
-gunicorn
+SQLAlchemy
+Flask-SQLAlchemy
+APScheduler
