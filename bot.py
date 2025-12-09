@@ -9,7 +9,6 @@ import json
 import datetime
 import threading
 from flask import Flask, request, render_template_string, redirect, url_for, session
-from flask_sqlalchemy import SQLAlchemy
 from apscheduler.schedulers.background import BackgroundScheduler
 from functools import wraps
 from bs4 import BeautifulSoup
@@ -21,53 +20,17 @@ HEMANTH_WHATSAPP_NUMBER = "918970913832"
 ADMIN_PASSWORD = "hemanth_admin"
 SECRET_KEY = "super_secret_key"
 
-# Database Config
-basedir = os.path.abspath(os.path.dirname(__file__))
 app = Flask(__name__)
 app.secret_key = SECRET_KEY
-
-# 🔴 YOUR DATABASE URL IS HERE
-database_url = "postgresql://postgres:Ngh%402003@db.drvivmkgypzxfcwarqav.supabase.co:5432/postgres"
-
-# Fix for SQLAlchemy format (postgres:// -> postgresql://)
-if database_url and database_url.startswith("postgres://"):
-    database_url = database_url.replace("postgres://", "postgresql://", 1)
-
-app.config['SQLALCHEMY_DATABASE_URI'] = database_url
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
-db = SQLAlchemy(app)
 bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
 
-# --- 2. DATABASE MODELS ---
-class User(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    chat_id = db.Column(db.String(50), unique=True, nullable=False)
-    username = db.Column(db.String(100))
-    joined_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
-
-class Source(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    url = db.Column(db.String(500), unique=True, nullable=False)
-    name = db.Column(db.String(100))
-    last_fetched = db.Column(db.DateTime)
-    is_active = db.Column(db.Boolean, default=True)
-
-class Job(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(300))
-    url = db.Column(db.String(500), unique=True)
-    raw_desc = db.Column(db.Text)
-    posted_date = db.Column(db.String(50))
-    ai_analysis = db.Column(db.Text)
-    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
-
-# Create Tables & Default Feed
-with app.app_context():
-    db.create_all()
-    if not Source.query.first():
-        db.session.add(Source(url="https://www.karnatakacareers.org/feed/", name="Karnataka Careers"))
-        db.session.commit()
+# --- 2. IN-MEMORY STORAGE (RAM) ---
+# This replaces the database
+DATA_STORE = {
+    "users": set(),  # Stores chat_ids
+    "sources": ["https://www.karnatakacareers.org/feed/"],
+    "jobs": []       # Stores job dictionaries
+}
 
 # --- 3. AI ENGINE (GROQ) ---
 def extract_json_from_text(text):
@@ -115,33 +78,45 @@ def get_ai_analysis_json(job_text):
 
 # --- 4. INGESTION WORKER ---
 def fetch_feeds():
-    with app.app_context():
-        sources = Source.query.filter_by(is_active=True).all()
-        for source in sources:
-            try:
-                d = feedparser.parse(source.url, agent="Mozilla/5.0")
-                for entry in d.entries:
-                    if not Job.query.filter_by(url=entry.link).first():
-                        # Smart Text Extraction
-                        raw_html = ""
-                        if 'content' in entry: raw_html = entry.content[0].value
-                        elif 'summary' in entry: raw_html = entry.summary
-                        elif 'description' in entry: raw_html = entry.description
-                        
-                        soup = BeautifulSoup(raw_html, "html.parser")
-                        clean = soup.get_text(separator="\n").strip()
-                        if len(clean) < 50: clean = f"Job Title: {entry.title}. Visit link for info."
+    """Background task to fetch RSS feeds"""
+    print("🔄 Fetching feeds...")
+    for source_url in DATA_STORE["sources"]:
+        try:
+            d = feedparser.parse(source_url, agent="Mozilla/5.0")
+            count = 0
+            for entry in d.entries:
+                # Deduplication check
+                if not any(j['url'] == entry.link for j in DATA_STORE["jobs"]):
+                    
+                    # Text Extraction
+                    raw_html = ""
+                    if 'content' in entry: raw_html = entry.content[0].value
+                    elif 'summary' in entry: raw_html = entry.summary
+                    elif 'description' in entry: raw_html = entry.description
+                    
+                    soup = BeautifulSoup(raw_html, "html.parser")
+                    clean = soup.get_text(separator="\n").strip()
+                    if len(clean) < 50: clean = f"Job Title: {entry.title}. Visit link for info."
 
-                        new_job = Job(
-                            title=entry.title, url=entry.link, raw_desc=clean,
-                            posted_date=datetime.datetime.now().strftime("%Y-%m-%d"),
-                            ai_analysis=""
-                        )
-                        db.session.add(new_job)
-                        print(f"✅ Ingested: {entry.title}")
-                source.last_fetched = datetime.datetime.utcnow()
-                db.session.commit()
-            except Exception as e: print(f"Feed Error {source.url}: {e}")
+                    new_job = {
+                        "id": len(DATA_STORE["jobs"]) + 1,
+                        "title": entry.title,
+                        "url": entry.link,
+                        "raw_desc": clean,
+                        "posted_date": datetime.datetime.now().strftime("%Y-%m-%d"),
+                        "ai_analysis": ""
+                    }
+                    # Add to top of list
+                    DATA_STORE["jobs"].insert(0, new_job)
+                    count += 1
+            
+            # Keep list manageable (Max 50 jobs in memory)
+            if len(DATA_STORE["jobs"]) > 50:
+                DATA_STORE["jobs"] = DATA_STORE["jobs"][:50]
+                
+            print(f"✅ Ingested {count} new jobs from {source_url}")
+            
+        except Exception as e: print(f"Feed Error {source_url}: {e}")
 
 scheduler = BackgroundScheduler()
 scheduler.add_job(func=fetch_feeds, trigger="interval", minutes=30)
@@ -151,14 +126,14 @@ scheduler.start()
 HTML_TEMPLATE = """
 <!DOCTYPE html><html><head><title>HC Admin</title><link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"></head>
 <body class="bg-light p-4">
-    <nav class="navbar navbar-dark bg-primary mb-4 rounded px-3"><span class="navbar-brand">🤖 HC Bot Admin</span><a href="/logout" class="text-white">Logout</a></nav>
+    <nav class="navbar navbar-dark bg-primary mb-4 rounded px-3"><span class="navbar-brand">🤖 HC Bot Admin (RAM Mode)</span><a href="/logout" class="text-white">Logout</a></nav>
     <div class="row mb-4">
-        <div class="col-md-4"><div class="card p-3"><h3>{{ users }}</h3><small>Users</small></div></div>
-        <div class="col-md-4"><div class="card p-3"><h3>{{ jobs }}</h3><small>Jobs</small></div></div>
+        <div class="col-md-4"><div class="card p-3"><h3>{{ users }}</h3><small>Users (Session)</small></div></div>
+        <div class="col-md-4"><div class="card p-3"><h3>{{ jobs }}</h3><small>Jobs (Cached)</small></div></div>
         <div class="col-md-4"><div class="card p-3"><h3>{{ sources|length }}</h3><small>Feeds</small></div></div>
     </div>
     <div class="card mb-4"><div class="card-header">Manage Sources</div><div class="card-body">
-        <ul class="list-group mb-3">{% for s in sources %}<li class="list-group-item d-flex justify-content-between">{{ s.url }} <a href="/del/{{ s.id }}" class="btn btn-danger btn-sm">X</a></li>{% endfor %}</ul>
+        <ul class="list-group mb-3">{% for s in sources %}<li class="list-group-item d-flex justify-content-between">{{ s }} <a href="/del?url={{ s }}" class="btn btn-danger btn-sm">X</a></li>{% endfor %}</ul>
         <form action="/add" method="post" class="d-flex"><input name="url" class="form-control me-2" placeholder="RSS URL"><button class="btn btn-success">Add</button></form>
     </div></div>
     <div class="card"><div class="card-header">Actions</div><div class="card-body"><a href="/force_update" class="btn btn-warning">🔄 Force Update Feeds Now</a></div></div>
@@ -185,18 +160,22 @@ def logout(): session.clear(); return redirect('/login')
 
 @app.route('/admin')
 @login_required
-def admin(): return render_template_string(HTML_TEMPLATE, users=User.query.count(), jobs=Job.query.count(), sources=Source.query.all())
+def admin(): return render_template_string(HTML_TEMPLATE, users=len(DATA_STORE["users"]), jobs=len(DATA_STORE["jobs"]), sources=DATA_STORE["sources"])
 
 @app.route('/add', methods=['POST'])
 @login_required
 def add():
-    if request.form.get('url'): db.session.add(Source(url=request.form.get('url'), name="New")); db.session.commit()
+    url = request.form.get('url')
+    if url and url not in DATA_STORE["sources"]:
+        DATA_STORE["sources"].append(url)
     return redirect('/admin')
 
-@app.route('/del/<int:id>')
+@app.route('/del')
 @login_required
-def delete(id):
-    s = Source.query.get(id); db.session.delete(s); db.session.commit()
+def delete():
+    url = request.args.get('url')
+    if url in DATA_STORE["sources"]:
+        DATA_STORE["sources"].remove(url)
     return redirect('/admin')
 
 @app.route('/force_update')
@@ -213,11 +192,7 @@ user_sessions = {}
 
 @bot.message_handler(commands=['start', 'hi'])
 def send_welcome(message):
-    chat_id = str(message.chat.id)
-    with app.app_context():
-        if not User.query.filter_by(chat_id=chat_id).first():
-            db.session.add(User(chat_id=chat_id, username=message.from_user.username))
-            db.session.commit()
+    DATA_STORE["users"].add(message.chat.id)
     
     markup = types.ReplyKeyboardMarkup(row_width=2, one_time_keyboard=True)
     markup.add("SSLC", "PUC", "Diploma", "BE/B.Tech", "Degree", "Any Qualification")
@@ -236,69 +211,59 @@ def ask_district(message):
 def show_results(message):
     try:
         user_id = message.chat.id
-        bot.send_message(user_id, "🔍 Searching Live Database...")
+        bot.send_message(user_id, "🔍 Searching Jobs...")
         
-        with app.app_context():
-            jobs = Job.query.order_by(Job.id.desc()).limit(5).all()
-            
-            if not jobs:
-                bot.send_message(user_id, "⚠️ Database is updating... please wait 1 min and try again.")
-                return
+        # Get latest 5 jobs from RAM
+        jobs = DATA_STORE["jobs"][:5]
+        
+        if not jobs:
+            bot.send_message(user_id, "⚠️ No jobs found yet. Admin is ingesting... wait 1 min.")
+            return
 
-            for job in jobs:
-                markup = types.InlineKeyboardMarkup()
-                markup.add(types.InlineKeyboardButton("✨ AI Insight", callback_data=f"ai_{job.id}"))
-                wa_link = f"https://wa.me/{HEMANTH_WHATSAPP_NUMBER}?text={urllib.parse.quote(f'Hi Hemanth, apply for {job.title}')}"
-                markup.add(types.InlineKeyboardButton("📩 Apply", url=wa_link))
-                
-                bot.send_message(user_id, f"🔹 *{job.title}*\n📅 {job.posted_date}", parse_mode="Markdown", reply_markup=markup)
+        for job in jobs:
+            markup = types.InlineKeyboardMarkup()
+            markup.add(types.InlineKeyboardButton("✨ AI Insight", callback_data=f"ai_{job['id']}"))
+            wa_link = f"https://wa.me/{HEMANTH_WHATSAPP_NUMBER}?text={urllib.parse.quote(f'Hi Hemanth, apply for {job['title']}')}"
+            markup.add(types.InlineKeyboardButton("📩 Apply", url=wa_link))
+            
+            bot.send_message(user_id, f"🔹 *{job['title']}*\n📅 {job['posted_date']}", parse_mode="Markdown", reply_markup=markup)
     except Exception as e:
         print(f"Error: {e}")
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('ai_'))
 def handle_ai(call):
     try:
-        job_id = call.data.split("_")[1]
-        with app.app_context():
-            job = Job.query.get(job_id)
-            if job:
-                bot.answer_callback_query(call.id, "🤖 Analyzing...")
-                
-                # Check update needed
-                force_update = False
-                if job.ai_analysis:
-                    try:
-                        existing = json.loads(job.ai_analysis)
-                        if existing.get('role') == 'Job Title': force_update = True
-                    except: force_update = True
-
-                if not job.ai_analysis or len(job.ai_analysis) < 5 or force_update:
-                    analysis = get_ai_analysis_json(job.raw_desc)
-                    if analysis:
-                        job.ai_analysis = analysis
-                        db.session.commit()
-                    else:
-                        bot.send_message(call.message.chat.id, "⚠️ AI Error. Check link.")
-                        return
-
-                if job.ai_analysis and len(job.ai_analysis) > 5:
-                    data = json.loads(job.ai_analysis)
-                    role = data.get('role', 'N/A')
-                    exp = data.get('exp', 'N/A')
-                    skills_raw = data.get('skills', [])
-                    skills = ", ".join(skills_raw) if isinstance(skills_raw, list) else str(skills_raw)
-                    summary = data.get('summary', 'N/A')
-                    msg = f"🤖 *AI Insight*\n\n📌 *Role:* {role}\n🎓 *Exp:* {exp}\n🛠 *Skills:* {skills}\n📝 *Summary:* {summary}"
-                    bot.send_message(call.message.chat.id, msg, parse_mode="Markdown")
+        job_id = int(call.data.split("_")[1])
+        # Find job in list
+        job = next((j for j in DATA_STORE["jobs"] if j["id"] == job_id), None)
+        
+        if job:
+            bot.answer_callback_query(call.id, "🤖 Analyzing...")
+            
+            # Check if analysis is missing
+            if not job["ai_analysis"] or len(job["ai_analysis"]) < 5:
+                analysis = get_ai_analysis_json(job["raw_desc"])
+                if analysis:
+                    job["ai_analysis"] = analysis
                 else:
-                    bot.send_message(call.message.chat.id, "⚠️ AI returned empty data.")
+                    bot.send_message(call.message.chat.id, "⚠️ AI Error. Check link.")
+                    return
+
+            if job["ai_analysis"]:
+                data = json.loads(job["ai_analysis"])
+                role = data.get('role', 'N/A')
+                exp = data.get('exp', 'N/A')
+                skills_raw = data.get('skills', [])
+                skills = ", ".join(skills_raw) if isinstance(skills_raw, list) else str(skills_raw)
+                summary = data.get('summary', 'N/A')
+                msg = f"🤖 *AI Insight*\n\n📌 *Role:* {role}\n🎓 *Exp:* {exp}\n🛠 *Skills:* {skills}\n📝 *Summary:* {summary}"
+                bot.send_message(call.message.chat.id, msg, parse_mode="Markdown")
+            else:
+                bot.send_message(call.message.chat.id, "⚠️ AI returned empty data.")
     except Exception as e:
         print(f"AI Callback Error: {e}")
 
 if __name__ == "__main__":
-    with app.app_context():
-        db.create_all()
-    
     try: bot.remove_webhook()
     except: pass
 
