@@ -12,8 +12,8 @@ import google.generativeai as genai
 
 # --- 1. CONFIGURATION ---
 # 🔴 PASTE YOUR KEYS HERE
-TELEGRAM_BOT_TOKEN = "YOUR_TELEGRAM_BOT_TOKEN"
-GEMINI_API_KEY = "YOUR_GEMINI_API_KEY"  
+TELEGRAM_BOT_TOKEN = "8300070205:AAF3kfF2P_bSMtnJTc8uJC2waq9d2iRm0i0"
+GEMINI_API_KEY = "AIzaSyDA-0mch6ZRr9eARG97bYunAATQQ81gb8k"  
 HEMANTH_WHATSAPP_NUMBER = "918970913832"
 
 RSS_FEEDS = [
@@ -222,3 +222,4 @@ if __name__ == "__main__":
     t.start()
     port = int(os.environ.get("PORT", 5000))
     server.run(host="0.0.0.0", port=port)
+
