@@ -32,7 +32,7 @@ app_data = {
 
 # Initialize AI & Bot
 genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel('gemini-1.5-flash')
+model = genai.GenerativeModel('gemini-pro')
 bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
 server = Flask(__name__)
 server.secret_key = SECRET_KEY
@@ -329,3 +329,4 @@ if __name__ == "__main__":
     t = threading.Thread(target=bot.infinity_polling)
     t.start()
     server.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+
