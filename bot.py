@@ -114,7 +114,7 @@ def get_ai_analysis_json(job_text):
         print(f"AI Error: {e}")
         return None
 
-# --- 4. INGESTION WORKER ---
+# --- 4. IMPROVED INGESTION WORKER ---
 def fetch_feeds():
     """Background task to fetch RSS feeds"""
     with app.app_context():
@@ -125,8 +125,23 @@ def fetch_feeds():
                 d = feedparser.parse(source.url, agent="Mozilla/5.0")
                 for entry in d.entries:
                     if not Job.query.filter_by(url=entry.link).first():
-                        soup = BeautifulSoup(entry.description, "html.parser")
-                        clean = soup.get_text(separator="\n")
+                        # 🔍 SMART TEXT EXTRACTION (Try 3 methods)
+                        raw_html = ""
+                        if 'content' in entry:
+                            raw_html = entry.content[0].value
+                        elif 'summary' in entry:
+                            raw_html = entry.summary
+                        elif 'description' in entry:
+                            raw_html = entry.description
+                        
+                        # Clean the HTML
+                        soup = BeautifulSoup(raw_html, "html.parser")
+                        clean = soup.get_text(separator="\n").strip()
+                        
+                        # Fallback: If text is too short, use Title
+                        if len(clean) < 50:
+                            clean = f"Job Title: {entry.title}. Please visit link for details."
+
                         new_job = Job(
                             title=entry.title, url=entry.link, raw_desc=clean,
                             posted_date=datetime.datetime.now().strftime("%Y-%m-%d"),
@@ -260,11 +275,43 @@ def handle_ai(call):
             job = Job.query.get(job_id)
             if job:
                 bot.answer_callback_query(call.id, "🤖 Analyzing...")
-                if not job.ai_analysis or len(job.ai_analysis) < 5:
+                
+                # Check if analysis is missing OR if it was bad ("N/A")
+                force_update = False
+                if job.ai_analysis:
+                    try:
+                        existing = json.loads(job.ai_analysis)
+                        if existing.get('role') == 'Job Title': # Check for default placeholder
+                            force_update = True
+                    except: force_update = True
+
+                if not job.ai_analysis or len(job.ai_analysis) < 5 or force_update:
+                    # Retry Analysis
                     analysis = get_ai_analysis_json(job.raw_desc)
                     if analysis:
                         job.ai_analysis = analysis
                         db.session.commit()
+                    else:
+                        bot.send_message(call.message.chat.id, "⚠️ AI could not read this job. Please check the official link.")
+                        return
+
+                # Display Analysis
+                if job.ai_analysis and len(job.ai_analysis) > 5:
+                    data = json.loads(job.ai_analysis)
+                    role = data.get('role', 'N/A')
+                    exp = data.get('exp', 'N/A')
+                    # Handle skills list or string
+                    skills_raw = data.get('skills', [])
+                    skills = ", ".join(skills_raw) if isinstance(skills_raw, list) else str(skills_raw)
+                    summary = data.get('summary', 'N/A')
+                    
+                    msg = f"🤖 *AI Insight*\n\n📌 *Role:* {role}\n🎓 *Exp:* {exp}\n🛠 *Skills:* {skills}\n📝 *Summary:* {summary}"
+                    bot.send_message(call.message.chat.id, msg, parse_mode="Markdown")
+                else:
+                    bot.send_message(call.message.chat.id, "⚠️ AI returned empty data.")
+    except Exception as e:
+        print(f"AI Callback Error: {e}")
+        bot.send_message(call.message.chat.id, "⚠️ Error loading AI data.")
                 
                 # Check again
                 if job.ai_analysis and len(job.ai_analysis) > 5:
@@ -294,4 +341,5 @@ if __name__ == "__main__":
     
     # Run Server
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+
 
