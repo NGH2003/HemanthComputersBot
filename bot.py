@@ -15,24 +15,25 @@ from functools import wraps
 from bs4 import BeautifulSoup
 
 # --- 1. CONFIGURATION ---
-TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "8300070205:AAF3kfF2P_bSMtnJTc8uJC2waq9d2iRm0i0")
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "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") 
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "YOUR_TELEGRAM_BOT_TOKEN")
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "YOUR_GROQ_API_KEY") 
 HEMANTH_WHATSAPP_NUMBER = "918970913832"
 ADMIN_PASSWORD = "hemanth_admin"
 SECRET_KEY = "super_secret_key"
 
-# Database Config (Supabase Support)
+# Database Config
 basedir = os.path.abspath(os.path.dirname(__file__))
 app = Flask(__name__)
 app.secret_key = SECRET_KEY
 
-# Logic to handle Render's Postgres URL vs Local SQLite
-database_url = os.environ.get("DATABASE_URL")
-if database_url and database_url.startswith("postgres://"):
-    database_url = os.environ.get("postgresql://postgres:Ngh%402003@db.drvivmkgypzxfcwarqav.supabase.co:5432/postgres")
-   
+# 🔴 YOUR DATABASE URL IS HERE (Correctly formatted with quotes)
+database_url = "postgresql://postgres:Ngh%402003@db.drvivmkgypzxfcwarqav.supabase.co:5432/postgres"
 
-app.config['SQLALCHEMY_DATABASE_URI'] = database_url or 'sqlite:///' + os.path.join(basedir, 'bot.db')
+# Fix for SQLAlchemy format (postgres:// -> postgresql://)
+if database_url and database_url.startswith("postgres://"):
+    database_url = database_url.replace("postgres://", "postgresql://", 1)
+
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
@@ -64,14 +65,12 @@ class Job(db.Model):
 # Create Tables & Default Feed
 with app.app_context():
     db.create_all()
-    # Add default feed only if DB is empty
     if not Source.query.first():
         db.session.add(Source(url="https://www.karnatakacareers.org/feed/", name="Karnataka Careers"))
         db.session.commit()
 
 # --- 3. AI ENGINE (GROQ) ---
 def extract_json_from_text(text):
-    """Helper to find JSON inside AI response"""
     try:
         start = text.find('{')
         end = text.rfind('}') + 1
@@ -81,7 +80,6 @@ def extract_json_from_text(text):
     except: return None
 
 def get_ai_analysis_json(job_text):
-    """Forces Groq to return STRUCTURED JSON data"""
     try:
         clean_job_text = job_text[:3500].replace('"', "'") 
         system_prompt = "You are a Job Data API. Output valid JSON only."
@@ -115,33 +113,24 @@ def get_ai_analysis_json(job_text):
         print(f"AI Error: {e}")
         return None
 
-# --- 4. IMPROVED INGESTION WORKER ---
+# --- 4. INGESTION WORKER ---
 def fetch_feeds():
-    """Background task to fetch RSS feeds"""
     with app.app_context():
         sources = Source.query.filter_by(is_active=True).all()
         for source in sources:
             try:
-                # Add User-Agent to avoid blocks
                 d = feedparser.parse(source.url, agent="Mozilla/5.0")
                 for entry in d.entries:
                     if not Job.query.filter_by(url=entry.link).first():
-                        # 🔍 SMART TEXT EXTRACTION (Try 3 methods)
+                        # Smart Text Extraction
                         raw_html = ""
-                        if 'content' in entry:
-                            raw_html = entry.content[0].value
-                        elif 'summary' in entry:
-                            raw_html = entry.summary
-                        elif 'description' in entry:
-                            raw_html = entry.description
+                        if 'content' in entry: raw_html = entry.content[0].value
+                        elif 'summary' in entry: raw_html = entry.summary
+                        elif 'description' in entry: raw_html = entry.description
                         
-                        # Clean the HTML
                         soup = BeautifulSoup(raw_html, "html.parser")
                         clean = soup.get_text(separator="\n").strip()
-                        
-                        # Fallback: If text is too short, use Title
-                        if len(clean) < 50:
-                            clean = f"Job Title: {entry.title}. Please visit link for details."
+                        if len(clean) < 50: clean = f"Job Title: {entry.title}. Visit link for info."
 
                         new_job = Job(
                             title=entry.title, url=entry.link, raw_desc=clean,
@@ -154,7 +143,6 @@ def fetch_feeds():
                 db.session.commit()
             except Exception as e: print(f"Feed Error {source.url}: {e}")
 
-# Run Fetch every 30 mins
 scheduler = BackgroundScheduler()
 scheduler.add_job(func=fetch_feeds, trigger="interval", minutes=30)
 scheduler.start()
@@ -215,7 +203,7 @@ def delete(id):
 @login_required
 def force_update():
     t = threading.Thread(target=fetch_feeds); t.start()
-    return "Update Started in background! <a href='/admin'>Back</a>"
+    return "Update Started! Check back in 1 min. <a href='/admin'>Back</a>"
 
 @app.route('/')
 def home(): return redirect('/login')
@@ -251,7 +239,6 @@ def show_results(message):
         bot.send_message(user_id, "🔍 Searching Live Database...")
         
         with app.app_context():
-            # Get latest 5 jobs
             jobs = Job.query.order_by(Job.id.desc()).limit(5).all()
             
             if not jobs:
@@ -277,54 +264,34 @@ def handle_ai(call):
             if job:
                 bot.answer_callback_query(call.id, "🤖 Analyzing...")
                 
-                # Check if analysis is missing OR if it was bad ("N/A")
+                # Check update needed
                 force_update = False
                 if job.ai_analysis:
                     try:
                         existing = json.loads(job.ai_analysis)
-                        if existing.get('role') == 'Job Title': # Check for default placeholder
-                            force_update = True
+                        if existing.get('role') == 'Job Title': force_update = True
                     except: force_update = True
 
                 if not job.ai_analysis or len(job.ai_analysis) < 5 or force_update:
-                    # Retry Analysis
                     analysis = get_ai_analysis_json(job.raw_desc)
                     if analysis:
                         job.ai_analysis = analysis
                         db.session.commit()
                     else:
-                        bot.send_message(call.message.chat.id, "⚠️ AI could not read this job. Please check the official link.")
+                        bot.send_message(call.message.chat.id, "⚠️ AI Error. Check link.")
                         return
 
-                # Display Analysis
                 if job.ai_analysis and len(job.ai_analysis) > 5:
                     data = json.loads(job.ai_analysis)
                     role = data.get('role', 'N/A')
                     exp = data.get('exp', 'N/A')
-                    # Handle skills list or string
                     skills_raw = data.get('skills', [])
                     skills = ", ".join(skills_raw) if isinstance(skills_raw, list) else str(skills_raw)
                     summary = data.get('summary', 'N/A')
-                    
                     msg = f"🤖 *AI Insight*\n\n📌 *Role:* {role}\n🎓 *Exp:* {exp}\n🛠 *Skills:* {skills}\n📝 *Summary:* {summary}"
                     bot.send_message(call.message.chat.id, msg, parse_mode="Markdown")
                 else:
                     bot.send_message(call.message.chat.id, "⚠️ AI returned empty data.")
-    except Exception as e:
-        print(f"AI Callback Error: {e}")
-        bot.send_message(call.message.chat.id, "⚠️ Error loading AI data.")
-                
-                # Check again
-                if job.ai_analysis and len(job.ai_analysis) > 5:
-                    data = json.loads(job.ai_analysis)
-                    role = data.get('role', 'N/A')
-                    exp = data.get('exp', 'N/A')
-                    skills = ", ".join(data.get('skills', []))
-                    summary = data.get('summary', 'N/A')
-                    msg = f"🤖 *AI Insight*\n\n📌 *Role:* {role}\n🎓 *Exp:* {exp}\n🛠 *Skills:* {skills}\n📝 *Summary:* {summary}"
-                    bot.send_message(call.message.chat.id, msg, parse_mode="Markdown")
-                else:
-                    bot.send_message(call.message.chat.id, "⚠️ AI could not analyze this job.")
     except Exception as e:
         print(f"AI Callback Error: {e}")
 
@@ -332,16 +299,10 @@ if __name__ == "__main__":
     with app.app_context():
         db.create_all()
     
-    # Remove Webhook to prevent conflicts
     try: bot.remove_webhook()
     except: pass
 
-    # Run Bot
     t = threading.Thread(target=bot.infinity_polling)
     t.start()
     
-    # Run Server
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
-
-
-
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000))
