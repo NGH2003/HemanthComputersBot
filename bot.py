@@ -13,10 +13,10 @@ from functools import wraps
 import datetime
 
 # --- 1. CONFIGURATION ---
-TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "YOUR_TELEGRAM_BOT_TOKEN")
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "8300070205:AAF3kfF2P_bSMtnJTc8uJC2waq9d2iRm0i0")
 
 # 🔴 PASTE YOUR NEW GROQ API KEY HERE
-GROQ_API_KEY = "YOUR_GROQ_API_KEY_HERE" 
+GROQ_API_KEY = "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" 
 
 HEMANTH_WHATSAPP_NUMBER = "918970913832"
 ADMIN_PASSWORD = "hemanth_admin"
@@ -332,3 +332,4 @@ if __name__ == "__main__":
     t = threading.Thread(target=bot.infinity_polling)
     t.start()
     server.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+
