@@ -1,4 +1,6 @@
 pyTelegramBotAPI
 feedparser
 flask
-gunicorn
+google-generativeai
+beautifulsoup4
+requests
