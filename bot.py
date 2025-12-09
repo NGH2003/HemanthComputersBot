@@ -4,7 +4,7 @@ import feedparser
 import urllib.parse
 import re
 import os
-import requests # <--- We need this for the CURL-like request
+import requests
 import json
 from flask import Flask, request, render_template_string, redirect, url_for, session
 import threading
@@ -13,9 +13,11 @@ from functools import wraps
 import datetime
 
 # --- 1. CONFIGURATION ---
-TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "8300070205:AAF3kfF2P_bSMtnJTc8uJC2waq9d2iRm0i0")
-# 🔴 Replace with your NEW API Key (Delete the old exposed one!)
-GEMINI_API_KEY = "AIzaSyBCAWd0C272SY6LmMYikMqziHvncN1o8gk" 
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "YOUR_TELEGRAM_BOT_TOKEN")
+
+# 🔴 PASTE YOUR NEW GROQ API KEY HERE
+GROQ_API_KEY = "YOUR_GROQ_API_KEY_HERE" 
+
 HEMANTH_WHATSAPP_NUMBER = "918970913832"
 ADMIN_PASSWORD = "hemanth_admin"
 SECRET_KEY = "super_secret_key"
@@ -42,7 +44,7 @@ def log_msg(message):
     app_data["logs"].insert(0, entry)
     if len(app_data["logs"]) > 50: app_data["logs"].pop()
 
-# --- 3. AI & JOB FUNCTIONS ---
+# --- 3. GROQ AI FUNCTION (Llama 3) ---
 
 def clean_html(html_text):
     soup = BeautifulSoup(html_text, "html.parser")
@@ -50,47 +52,53 @@ def clean_html(html_text):
 
 def get_personalized_summary(job_text, user_age, user_qual):
     """
-    Uses Gemini 2.0 Flash via direct HTTP Request
+    Uses Groq (Llama 3) for super fast, free AI summaries
     """
     try:
         age_txt = user_age if user_age and user_age.isdigit() else "Not Provided"
         qual_txt = user_qual if user_qual else "Not Provided"
         
-        prompt_text = (
-            f"Act as a Job Expert. Compare User Profile with Job.\n"
-            f"User Profile: Age {age_txt}, Qualification {qual_txt}\n"
-            f"Job Notification: {job_text[:3000]}\n"
-            f"Task:\n"
-            f"1. Start with '✅ Eligible', '❌ Not Eligible', or '⚠️ Check details'.\n"
-            f"2. Explain why in 1 short sentence.\n"
-            f"3. List: Role, Posts, Age Limit, Last Date."
+        system_prompt = "You are a helpful Job Eligibility Assistant. Keep answers short and precise."
+        user_prompt = (
+            f"Check Eligibility:\n"
+            f"User: Age {age_txt}, Qual {qual_txt}\n"
+            f"Job: {job_text[:2500]}\n\n"
+            f"Output Format:\n"
+            f"1. Verdict: '✅ Eligible', '❌ Not Eligible', or '⚠️ Check Details'.\n"
+            f"2. Reason: One short sentence.\n"
+            f"3. Details: Role, Posts, Last Date."
         )
 
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
-        headers = {'Content-Type': 'application/json'}
-        data = { "contents": [{ "parts": [{"text": prompt_text}] }] }
+        url = "https://api.groq.com/openai/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {GROQ_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        data = {
+            "model": "llama3-8b-8192", # Free, Fast Model
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            "temperature": 0.5,
+            "max_tokens": 300
+        }
 
         response = requests.post(url, headers=headers, json=data)
         
-        # --- NEW ERROR HANDLING ---
         if response.status_code == 200:
             result = response.json()
-            ai_text = result['candidates'][0]['content']['parts'][0]['text']
+            ai_text = result['choices'][0]['message']['content']
             app_data["requests_count"] += 1
             return ai_text
-            
-        elif response.status_code == 429:
-            log_msg("Rate Limit Hit (429)")
-            return "⚠️ **AI is busy!** Too many people are checking right now. Please try again in 1 minute."
-            
         else:
-            log_msg(f"AI Error {response.status_code}: {response.text}")
-            return f"⚠️ AI System Error ({response.status_code}). Try applying directly."
+            log_msg(f"Groq Error {response.status_code}: {response.text}")
+            return "⚠️ AI Service Busy. Check link directly."
 
     except Exception as e:
         log_msg(f"Connection Error: {e}")
         return "⚠️ AI Service Busy."
-        
+
 def get_job_details(filters, age_limit):
     matches = []
     log_msg(f"Searching feeds for: {filters}")
@@ -143,13 +151,13 @@ HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Hemanth Bot Admin</title>
+    <title>HC Admin</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
 <body>
 <nav class="navbar navbar-dark bg-primary mb-4">
-  <div class="container"><span class="navbar-brand mb-0 h1">🤖 Hemanth Bot Admin</span></div>
+  <div class="container"><span class="navbar-brand mb-0 h1">🤖 HC Job Bot Admin</span></div>
 </nav>
 <div class="container">
     <div class="row">
@@ -184,7 +192,7 @@ HTML_TEMPLATE = """
 LOGIN_HTML = """
 <div style="height:100vh; display:flex; justify-content:center; align-items:center;">
     <form method="post" style="padding:20px; border:1px solid #ccc;">
-        <h3>Login</h3><input type="password" name="password"><button>Login</button>
+        <h3>HC Admin Login</h3><input type="password" name="password"><button>Login</button>
     </form>
 </div>
 """
@@ -233,9 +241,28 @@ user_sessions = {}
 def send_welcome(message):
     app_data["total_users"].add(message.chat.id)
     user_sessions[message.chat.id] = {"filters": []}
+    
+    # --- PERSONALIZED GREETING LOGIC ---
+    user_first_name = message.from_user.first_name
+    user_username = message.from_user.username
+    
+    # If they have a username, use @username, otherwise use First Name
+    if user_username:
+        display_name = f"@{user_username}"
+    else:
+        display_name = user_first_name
+        
+    welcome_text = (
+        f"👋 *Hi {display_name}!*\n"
+        f"Welcome to *HC Job Details Bot* 🚀\n\n"
+        f"I can help you find jobs and check your eligibility instantly.\n\n"
+        f"👇 *Select your Qualification to start:*"
+    )
+    # ------------------------------------
+
     markup = types.ReplyKeyboardMarkup(row_width=2, one_time_keyboard=True)
     markup.add("SSLC", "PUC", "Diploma", "BE/B.Tech", "Degree", "Any Qualification")
-    bot.send_message(message.chat.id, "👋 *Hemanth Bot*\nSelect Qualification:", parse_mode="Markdown", reply_markup=markup)
+    bot.send_message(message.chat.id, welcome_text, parse_mode="Markdown", reply_markup=markup)
     bot.register_next_step_handler(message, ask_district)
 
 def ask_district(message):
@@ -264,9 +291,7 @@ def show_results(message):
     text = message.text
     age_check = text if text.isdigit() else None
     
-    # Save Age and Qualification for AI Context
     user_sessions[user_id]["age"] = age_check if age_check else "Any"
-    # Try to find qualification in filters
     qual = "Any"
     for f in user_sessions[user_id]["filters"]:
         if f in ["SSLC", "PUC", "Diploma", "BE/B.Tech", "Degree"]: qual = f
@@ -296,9 +321,9 @@ def handle_ai(call):
         u_age = user_sessions[user_id].get("age", "Not Provided")
         u_qual = user_sessions[user_id].get("qual", "Not Provided")
         
-        bot.answer_callback_query(call.id, "🤖 AI Checking Eligibility...")
+        bot.answer_callback_query(call.id, "🤖 Checking with AI (Groq)...")
         summary = get_personalized_summary(job["raw_text"], u_age, u_qual)
-        bot.send_message(user_id, f"🤖 *AI Analysis (Gemini 2.0 Flash):*\n{summary}", parse_mode="Markdown")
+        bot.send_message(user_id, f"🤖 *AI Analysis:*\n{summary}", parse_mode="Markdown")
     except Exception as e:
         log_msg(f"Callback Error: {e}")
         bot.answer_callback_query(call.id, "Error.")
@@ -307,4 +332,3 @@ if __name__ == "__main__":
     t = threading.Thread(target=bot.infinity_polling)
     t.start()
     server.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
-
