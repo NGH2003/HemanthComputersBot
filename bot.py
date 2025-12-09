@@ -29,7 +29,8 @@ app.secret_key = SECRET_KEY
 # Logic to handle Render's Postgres URL vs Local SQLite
 database_url = os.environ.get("DATABASE_URL")
 if database_url and database_url.startswith("postgres://"):
-    database_url = postgresql://postgres:Ngh%402003@db.drvivmkgypzxfcwarqav.supabase.co:5432/postgres
+    database_url = os.environ.get("postgresql://postgres:Ngh%402003@db.drvivmkgypzxfcwarqav.supabase.co:5432/postgres")
+   
 
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url or 'sqlite:///' + os.path.join(basedir, 'bot.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -341,5 +342,6 @@ if __name__ == "__main__":
     
     # Run Server
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+
 
 
