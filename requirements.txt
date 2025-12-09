@@ -6,3 +6,4 @@ beautifulsoup4
 SQLAlchemy
 Flask-SQLAlchemy
 APScheduler
+psycopg2-binary
