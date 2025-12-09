@@ -1,6 +1,10 @@
-pyTelegramBotAPI
+fastapi
+uvicorn[standard]
+aiogram
+sqlmodel
 feedparser
-flask
-requests
+httpx
 beautifulsoup4
-APScheduler
+apscheduler
+python-dotenv
+gunicorn
