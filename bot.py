@@ -39,17 +39,22 @@ def clean_html(html_text):
 def get_ai_summary(job_text):
     """Asks Gemini to summarize the job details"""
     try:
+        # Debugging: Print to console so we can see it in Render Logs
+        print(f"🤖 Sending to AI: {job_text[:50]}...") 
+        
         prompt = (
             "Analyze this job notification and extract the following details strictly:\n"
             "1. Job Role\n2. Age Limit\n3. Qualification\n4. Application Fee\n5. Selection Process\n"
             "6. Last Date\n\n"
             "Keep it short, professional, and use emojis. If info is missing, say 'Not Mentioned'.\n"
-            f"Job Text: {job_text[:2000]}" 
+            f"Job Text: {job_text[:2000]}"
         )
         response = model.generate_content(prompt)
         return response.text
     except Exception as e:
-        return "⚠️ AI Service Busy. Please check the link directly."
+        # 🔴 THIS PRINTS THE REAL ERROR TO YOUR RENDER LOGS
+        print(f"❌ AI ERROR: {e}") 
+        return f"⚠️ Error: {e}"
 
 def get_job_details(filters, age_limit):
     """Searches ALL RSS feeds"""
@@ -217,3 +222,4 @@ if __name__ == "__main__":
     t.start()
     port = int(os.environ.get("PORT", 5000))
     server.run(host="0.0.0.0", port=port)
+
