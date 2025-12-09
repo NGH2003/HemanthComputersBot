@@ -50,13 +50,12 @@ def clean_html(html_text):
 
 def get_personalized_summary(job_text, user_age, user_qual):
     """
-    Uses Gemini 2.0 Flash via direct HTTP Request (Like CURL)
+    Uses Gemini 2.0 Flash via direct HTTP Request
     """
     try:
         age_txt = user_age if user_age and user_age.isdigit() else "Not Provided"
         qual_txt = user_qual if user_qual else "Not Provided"
         
-        # 1. Prepare the Prompt
         prompt_text = (
             f"Act as a Job Expert. Compare User Profile with Job.\n"
             f"User Profile: Age {age_txt}, Qualification {qual_txt}\n"
@@ -67,35 +66,31 @@ def get_personalized_summary(job_text, user_age, user_qual):
             f"3. List: Role, Posts, Age Limit, Last Date."
         )
 
-        # 2. The URL (Gemini 2.0 Flash)
         url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
-        
-        # 3. The Payload (JSON Data)
         headers = {'Content-Type': 'application/json'}
-        data = {
-            "contents": [{
-                "parts": [{"text": prompt_text}]
-            }]
-        }
+        data = { "contents": [{ "parts": [{"text": prompt_text}] }] }
 
-        # 4. Send Request (This is the Python version of CURL)
         response = requests.post(url, headers=headers, json=data)
         
-        # 5. Handle Response
+        # --- NEW ERROR HANDLING ---
         if response.status_code == 200:
             result = response.json()
-            # Extract text from complex JSON structure
             ai_text = result['candidates'][0]['content']['parts'][0]['text']
             app_data["requests_count"] += 1
             return ai_text
+            
+        elif response.status_code == 429:
+            log_msg("Rate Limit Hit (429)")
+            return "⚠️ **AI is busy!** Too many people are checking right now. Please try again in 1 minute."
+            
         else:
             log_msg(f"AI Error {response.status_code}: {response.text}")
-            return f"⚠️ AI Error: Server returned {response.status_code}"
+            return f"⚠️ AI System Error ({response.status_code}). Try applying directly."
 
     except Exception as e:
         log_msg(f"Connection Error: {e}")
         return "⚠️ AI Service Busy."
-
+        
 def get_job_details(filters, age_limit):
     matches = []
     log_msg(f"Searching feeds for: {filters}")
@@ -312,3 +307,4 @@ if __name__ == "__main__":
     t = threading.Thread(target=bot.infinity_polling)
     t.start()
     server.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+
