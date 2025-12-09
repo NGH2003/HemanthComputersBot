@@ -14,8 +14,8 @@ from functools import wraps
 from bs4 import BeautifulSoup
 
 # --- 1. CONFIGURATION ---
-TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "YOUR_TELEGRAM_BOT_TOKEN")
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "YOUR_GROQ_API_KEY") 
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "8300070205:AAF3kfF2P_bSMtnJTc8uJC2waq9d2iRm0i0")
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "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") 
 HEMANTH_WHATSAPP_NUMBER = "918970913832"
 ADMIN_PASSWORD = "hemanth_admin"
 SECRET_KEY = "super_secret_key"
@@ -342,3 +342,4 @@ if __name__ == "__main__":
     
     # Run Flask Server
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+
