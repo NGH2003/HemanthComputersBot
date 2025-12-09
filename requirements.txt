@@ -1,6 +1,6 @@
 pyTelegramBotAPI
 feedparser
 flask
-google-generativeai
+google-generativeai>=0.5.0
 beautifulsoup4
 requests
