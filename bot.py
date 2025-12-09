@@ -26,7 +26,7 @@ basedir = os.path.abspath(os.path.dirname(__file__))
 app = Flask(__name__)
 app.secret_key = SECRET_KEY
 
-# 🔴 YOUR DATABASE URL IS HERE (Correctly formatted with quotes)
+# 🔴 YOUR DATABASE URL IS HERE
 database_url = "postgresql://postgres:Ngh%402003@db.drvivmkgypzxfcwarqav.supabase.co:5432/postgres"
 
 # Fix for SQLAlchemy format (postgres:// -> postgresql://)
@@ -305,5 +305,4 @@ if __name__ == "__main__":
     t = threading.Thread(target=bot.infinity_polling)
     t.start()
     
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000))
-
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
