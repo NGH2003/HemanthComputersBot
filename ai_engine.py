@@ -6,24 +6,22 @@ import pdfplumber
 from bs4 import BeautifulSoup
 from groq import Groq
 
-# Initialize Groq
 client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 MODEL_NAME = "llama-3.3-70b-versatile"
 
-# --- 1. NEW: WEB SCRAPER & RSS FETCHER ---
+# --- WEB TOOLS ---
 def fetch_rss_feeds():
-    """Pulls latest updates from trusted Indian Job/Scheme sources"""
+    """Pulls latest updates from trusted sources"""
     feeds = [
         "https://kannada.oneindia.com/rss/feeds/kannada-jobs-fb.xml",
         "https://www.freejobalert.com/feed",
         "https://kannada.news18.com/commonfeeds/v1/kannada/rss/career.xml"
     ]
-    
     found_items = []
     for url in feeds:
         try:
             f = feedparser.parse(url)
-            for entry in f.entries[:5]: # Get top 5 from each
+            for entry in f.entries[:5]: 
                 found_items.append({
                     "title": entry.title,
                     "link": entry.link,
@@ -34,22 +32,16 @@ def fetch_rss_feeds():
     return found_items
 
 def fetch_url_text(url):
-    """Scrapes text from a website link (for the Sync feature)"""
+    """Scrapes text from a website link"""
     try:
         headers = {'User-Agent': 'Mozilla/5.0'}
         resp = requests.get(url, headers=headers, timeout=10)
         soup = BeautifulSoup(resp.content, 'html.parser')
-        
-        # Kill javascript and css
-        for script in soup(["script", "style"]):
-            script.extract()
-            
+        for script in soup(["script", "style"]): script.extract()
         text = soup.get_text()
-        # Clean up whitespace
         lines = (line.strip() for line in text.splitlines())
-        chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
-        text = '\n'.join(chunk for chunk in chunks if chunk)
-        return text[:10000] # Limit to 10k chars for AI
+        text = '\n'.join(chunk for line in lines for chunk in line.split("  ") if chunk)
+        return text[:10000] 
     except: return ""
 
 def extract_text_from_pdf(pdf_file):
@@ -62,53 +54,31 @@ def extract_text_from_pdf(pdf_file):
         return text
     except: return ""
 
-# --- 2. UPDATED AI ANALYSIS (Smart Mode) ---
+# --- AI ANALYSIS ---
 def analyze_notification(raw_text, mode="JOB"):
-    """
-    Analyzes text based on mode: JOB, SCHEME, or RESULT.
-    """
     api_key = os.environ.get("GROQ_API_KEY")
     if not api_key: return {"error": "CRITICAL: GROQ_API_KEY is missing."}
 
-    # Dynamic Prompt based on Category
     if mode == "SCHEME":
-        focus_prompt = """
-        This is a GOVERNMENT SCHEME.
-        1. Extract 'Benefits' (e.g. Rs 2000/month, Free Rice). Put this in 'summary'.
-        2. Extract 'Beneficiaries' (e.g. Women, Farmers, SC/ST). Put this in 'qualification'.
-        3. Extract 'Documents Required'.
-        """
+        focus = "Extract 'Benefits' (e.g. Rs 2000) and 'Beneficiaries' (e.g. Women)."
     elif mode in ["RESULT", "KEY_ANSWER"]:
-        focus_prompt = """
-        This is an EXAM RESULT or KEY ANSWER.
-        1. Extract the Exam Name.
-        2. Extract the Link to check result.
-        3. Keep summary very short (e.g., "FDA 2024 Results announced.").
-        """
-    else: # JOB or EXAM
-        focus_prompt = """
-        This is a JOB or EXAM notification.
-        1. Extract Job Title, Age, Qualification.
-        2. Extract Documents needed.
-        """
+        focus = "Extract Exam Name and Result Link."
+    else:
+        focus = "Extract Job Title, Age, Qualification, Documents."
 
     prompt = f"""
     Analyze this text and return JSON ONLY.
-    {focus_prompt}
+    Context: {focus}
     
     PART 2: DETAILED ANALYTICS (Markdown Report)
-    Generate a professional "Detailed Report" (Markdown) covering:
-    - Key Highlights / Benefits
-    - Eligibility / Beneficiaries
-    - Important Dates
-    - Steps to Apply / Check
+    Generate a professional "Detailed Report" (Markdown) covering Highlights, Eligibility, Dates, Fees.
     
     Structure:
     {{
         "title": "Title", 
-        "summary": "Short Kanglish summary (2 lines)", 
+        "summary": "Short Kanglish summary", 
         "min_age": 18, "max_age": 60,
-        "qualification": "Eligibility (e.g. Degree / Women Head of Family)", 
+        "qualification": "Eligibility", 
         "last_date": "DD/MM/YYYY", 
         "apply_link": "URL",
         "documents": "List of docs...",
@@ -116,7 +86,6 @@ def analyze_notification(raw_text, mode="JOB"):
     }}
     Text: {raw_text[:8000]} 
     """
-    
     try:
         chat = client.chat.completions.create(
             messages=[{"role": "user", "content": prompt}],
@@ -125,7 +94,6 @@ def analyze_notification(raw_text, mode="JOB"):
         return json.loads(chat.choices[0].message.content)
     except Exception as e: return {"error": f"Groq API Failed: {str(e)}"}
 
-# --- (Keep other generators same) ---
 def generate_daily_quiz_content(topic):
     prompt = f"""Generate 1 GK multiple-choice question on {topic}. Return JSON: {{ "question": "...", "options": ["A", "B", "C", "D"], "correct_option": "A" }}"""
     try:
