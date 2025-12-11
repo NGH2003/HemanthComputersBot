@@ -12,8 +12,8 @@ def get_whatsapp_number():
     try:
         res = supabase.table("settings").select("value").eq("key", "whatsapp_number").execute()
         if res.data: return res.data[0]['value']
-        return "919900000000" # Change this to your fallback number
-    except: return "919900000000"
+        return "918970913832" # Change this to your fallback number
+    except: return "918970913832"
 
 def add_user(user_id, first_name, username, qual, age, caste, gender):
     """Saves or Updates a User Profile"""
