@@ -18,27 +18,27 @@ def extract_text_from_pdf(pdf_file):
 
 def analyze_notification(raw_text):
     """Groq Llama 3: Extracts Job Details"""
+    
+    # 1. Check if Key exists
+    api_key = os.environ.get("GROQ_API_KEY")
+    if not api_key:
+        return {"error": "CRITICAL: GROQ_API_KEY is missing in Render Environment Variables."}
+
     prompt = f"""
     Analyze this job text. Return JSON ONLY.
-    
-    RULES:
-    1. Extract 'documents' (e.g., Aadhaar, Marks Card). If not found, use "Standard Docs".
-    2. Write a 'summary' in Kannada/English (Mixed).
-    3. CRITICAL: Do NOT put the application URL in the summary. Keep it hidden.
-    
     Structure:
     {{
         "title": "Job Title",
-        "summary": "Short summary here...",
+        "summary": "Short summary...",
         "min_age": 18, "max_age": 35,
-        "qualification": "Degree/SSLC",
+        "qualification": "Degree",
         "last_date": "DD/MM/YYYY",
         "apply_link": "URL",
         "documents": "List of docs..."
     }}
-
-    Text: {raw_text[:8000]}
+    Text: {raw_text[:6000]} 
     """
+    
     try:
         chat = client.chat.completions.create(
             messages=[{"role": "user", "content": prompt}],
@@ -46,8 +46,9 @@ def analyze_notification(raw_text):
             response_format={"type": "json_object"}
         )
         return json.loads(chat.choices[0].message.content)
-    except: return None
-
+    except Exception as e:
+        # RETURN THE REAL ERROR TO THE UI
+        return {"error": f"Groq API Failed: {str(e)}"}
 def generate_daily_quiz_content(topic):
     """Groq Llama 3: Generates a GK Question"""
     prompt = f"""
