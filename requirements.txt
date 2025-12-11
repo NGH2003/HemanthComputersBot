@@ -1,5 +1,5 @@
 streamlit
-python-telegram-bot
+python-telegram-bot==20.7
 groq
 supabase
 feedparser
@@ -7,3 +7,5 @@ schedule
 pandas
 pdfplumber
 pydantic
+beautifulsoup4
+requests
