@@ -10,14 +10,14 @@ def extract_text_from_pdf(pdf_file):
     try:
         with pdfplumber.open(pdf_file) as pdf:
             text = ""
-            for page in pdf.pages[:2]: # Read first 2 pages only to save AI cost
+            for page in pdf.pages[:2]: # Read first 2 pages
                 extracted = page.extract_text()
                 if extracted: text += extracted + "\n"
         return text
     except: return ""
 
 def analyze_notification(raw_text):
-    """Groq Llama 3: Extracts Job Details & Kannada Summary"""
+    """Groq Llama 3: Extracts Job Details"""
     prompt = f"""
     Analyze this job text. Return JSON ONLY.
     
@@ -62,3 +62,25 @@ def generate_daily_quiz_content(topic):
         )
         return json.loads(chat.choices[0].message.content)
     except: return None
+
+# --- NEW FUNCTION: GROQ POSTER PROMPT ---
+def generate_poster_prompt(job_title, qualification):
+    """Uses Groq to write an image prompt"""
+    prompt = f"""
+    Act as a professional graphic designer. 
+    Write a highly detailed text-to-image prompt to create a notification poster for: "{job_title}".
+    
+    Details to include in prompt:
+    - Qualification: {qualification}
+    - Style: Professional, Gold and Black theme, Cyber Cafe aesthetic.
+    - Text overlay instruction: "Apply at HC".
+    
+    Output ONLY the prompt text. No conversational filler.
+    """
+    try:
+        chat = client.chat.completions.create(
+            messages=[{"role": "user", "content": prompt}],
+            model="llama3-8b-8192",
+        )
+        return chat.choices[0].message.content
+    except: return "Error generating prompt."
