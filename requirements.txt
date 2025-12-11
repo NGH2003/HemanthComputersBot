@@ -1,10 +1,9 @@
 streamlit
-python-telegram-bot==20.7
+python-telegram-bot
 groq
 supabase
 feedparser
 schedule
 pandas
 pdfplumber
-google-generative-ai
-pydantic==1.10.13
+pydantic
