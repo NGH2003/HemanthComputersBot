@@ -44,13 +44,16 @@ with tab1:
                 if not txt or len(txt) < 50:
                     st.error("⚠️ Could not read text from PDF. It might be an image/scan. Please fill details manually.")
                 else:
-                    # 2. Analyze with Groq
+                   # 2. Analyze with Groq
                     data = analyze_notification(txt)
-                    if data: 
+                    
+                    if data and "error" in data:
+                        st.error(f"❌ {data['error']}")
+                    elif data: 
                         st.session_state['job_data'] = data
                         st.success("Analysis Complete!")
                     else:
-                        st.error("⚠️ AI Error: Check your GROQ_API_KEY in Render Settings.")
+                        st.error("⚠️ Unknown Error: AI returned no data.")
 
     # --- THE FORM (Now Outside the logic, so it always shows) ---
     with col2:
