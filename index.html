@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+
+    <div class="container">
+        <nav class="sidebar">
+            <div class="logo">
+                <h2><i class="fa-solid fa-layer-group"></i> AdminPanel</h2>
+            </div>
+            <ul>
+                <li><a href="#" class="active"><i class="fa-solid fa-house"></i> Dashboard</a></li>
+                <li><a href="#"><i class="fa-solid fa-user-group"></i> Users</a></li>
+                <li><a href="#"><i class="fa-solid fa-chart-line"></i> Analytics</a></li>
+                <li><a href="#"><i class="fa-solid fa-message"></i> Messages</a></li>
+                <li><a href="#"><i class="fa-solid fa-gear"></i> Settings</a></li>
+                <li class="logout"><a href="#"><i class="fa-solid fa-right-from-bracket"></i> Logout</a></li>
+            </ul>
+        </nav>
+
+        <main class="main-content">
+            <header>
+                <div class="header-title">
+                    <h1>Dashboard</h1>
+                    <span>Welcome back, Admin</span>
+                </div>
+                <div class="user-wrapper">
+                    <img src="https://via.placeholder.com/40" alt="User" class="user-img">
+                    <div>
+                        <h4>John Doe</h4>
+                        <small>Super Admin</small>
+                    </div>
+                </div>
+            </header>
+
+            <section class="cards">
+                <div class="card-single">
+                    <div>
+                        <h1>54</h1>
+                        <span>Customers</span>
+                    </div>
+                    <div>
+                        <i class="fa-solid fa-users"></i>
+                    </div>
+                </div>
+
+                <div class="card-single">
+                    <div>
+                        <h1>79</h1>
+                        <span>Projects</span>
+                    </div>
+                    <div>
+                        <i class="fa-solid fa-clipboard-list"></i>
+                    </div>
+                </div>
+
+                <div class="card-single">
+                    <div>
+                        <h1>124</h1>
+                        <span>Orders</span>
+                    </div>
+                    <div>
+                        <i class="fa-solid fa-bag-shopping"></i>
+                    </div>
+                </div>
+
+                <div class="card-single">
+                    <div>
+                        <h1>$6k</h1>
+                        <span>Income</span>
+                    </div>
+                    <div>
+                        <i class="fa-solid fa-wallet"></i>
+                    </div>
+                </div>
+            </section>
+
+            <section class="recent-grid">
+                <div class="projects">
+                    <div class="card-header">
+                        <h3>Recent Projects</h3>
+                        <button>See all <i class="fa-solid fa-arrow-right"></i></button>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table width="100%">
+                                <thead>
+                                    <tr>
+                                        <td>Project Title</td>
+                                        <td>Department</td>
+                                        <td>Status</td>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>UI/UX Design</td>
+                                        <td>Design Team</td>
+                                        <td><span class="status purple"></span> Review</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Web Development</td>
+                                        <td>Frontend</td>
+                                        <td><span class="status pink"></span> In Progress</td>
+                                    </tr>
+                                    <tr>
+                                        <td>App Testing</td>
+                                        <td>Mobile Team</td>
+                                        <td><span class="status orange"></span> Pending</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Marketing</td>
+                                        <td>Sales</td>
+                                        <td><span class="status purple"></span> Review</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+</body>
+</html>
