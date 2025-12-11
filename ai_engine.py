@@ -5,24 +5,27 @@ from groq import Groq
 
 client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 
+# --- UPDATE MODEL NAME HERE ---
+# We use the new standard model from Groq
+MODEL_NAME = "llama-3.3-70b-versatile" 
+
 def extract_text_from_pdf(pdf_file):
     """Reads text from uploaded PDF"""
     try:
         with pdfplumber.open(pdf_file) as pdf:
             text = ""
-            for page in pdf.pages[:2]: # Read first 2 pages
+            for page in pdf.pages[:2]: 
                 extracted = page.extract_text()
                 if extracted: text += extracted + "\n"
         return text
     except: return ""
 
 def analyze_notification(raw_text):
-    """Groq Llama 3: Extracts Job Details"""
+    """Groq: Extracts Job Details"""
     
-    # 1. Check if Key exists
     api_key = os.environ.get("GROQ_API_KEY")
     if not api_key:
-        return {"error": "CRITICAL: GROQ_API_KEY is missing in Render Environment Variables."}
+        return {"error": "CRITICAL: GROQ_API_KEY is missing."}
 
     prompt = f"""
     Analyze this job text. Return JSON ONLY.
@@ -42,15 +45,15 @@ def analyze_notification(raw_text):
     try:
         chat = client.chat.completions.create(
             messages=[{"role": "user", "content": prompt}],
-            model="llama3-8b-8192",
+            model=MODEL_NAME, # <--- UPDATED
             response_format={"type": "json_object"}
         )
         return json.loads(chat.choices[0].message.content)
     except Exception as e:
-        # RETURN THE REAL ERROR TO THE UI
         return {"error": f"Groq API Failed: {str(e)}"}
+
 def generate_daily_quiz_content(topic):
-    """Groq Llama 3: Generates a GK Question"""
+    """Groq: Generates a GK Question"""
     prompt = f"""
     Generate 1 GK multiple-choice question for Karnataka students. Topic: {topic}.
     Return JSON: {{ "question": "...", "options": ["A", "B", "C", "D"], "correct_option": "A" }}
@@ -58,30 +61,24 @@ def generate_daily_quiz_content(topic):
     try:
         chat = client.chat.completions.create(
             messages=[{"role": "user", "content": prompt}],
-            model="llama3-8b-8192",
+            model=MODEL_NAME, # <--- UPDATED
             response_format={"type": "json_object"}
         )
         return json.loads(chat.choices[0].message.content)
     except: return None
 
-# --- NEW FUNCTION: GROQ POSTER PROMPT ---
 def generate_poster_prompt(job_title, qualification):
     """Uses Groq to write an image prompt"""
     prompt = f"""
     Act as a professional graphic designer. 
     Write a highly detailed text-to-image prompt to create a notification poster for: "{job_title}".
-    
-    Details to include in prompt:
-    - Qualification: {qualification}
-    - Style: Professional, Gold and Black theme, Cyber Cafe aesthetic.
-    - Text overlay instruction: "Apply at HC".
-    
-    Output ONLY the prompt text. No conversational filler.
+    Details: Qualification: {qualification}. Style: Professional, Gold and Black theme.
+    Output ONLY the prompt text.
     """
     try:
         chat = client.chat.completions.create(
             messages=[{"role": "user", "content": prompt}],
-            model="llama3-8b-8192",
+            model=MODEL_NAME, # <--- UPDATED
         )
         return chat.choices[0].message.content
     except: return "Error generating prompt."
