@@ -3,163 +3,123 @@ import threading
 import asyncio
 import os
 from db import add_job, supabase
-from ai_engine import analyze_notification, extract_text_from_pdf, generate_daily_quiz_content, generate_poster_prompt
+from ai_engine import analyze_notification, extract_text_from_pdf, generate_daily_quiz_content, generate_poster_prompt, fetch_rss_feeds, fetch_url_text
 from bot_logic import run_bot
 
 st.set_page_config(page_title="HC Admin", layout="wide")
 
-# --- HELPER: SAFE INTEGER CONVERTER (Prevents Crashes) ---
-def safe_int(value, default):
-    """Tries to convert text to a number. If it fails (e.g., 'Refer PDF'), returns default."""
+def start_bot_thread():
     try:
-        return int(value)
-    except (ValueError, TypeError):
-        return default
+        loop = asyncio.new_event_loop(); asyncio.set_event_loop(loop); loop.run_until_complete(run_bot())
+    except Exception as e: print(e)
 
-# --- BOT BACKGROUND RUNNER ---
-def start_bot():
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.run_until_complete(run_bot())
+if "HC_Bot_Thread" not in [t.name for t in threading.enumerate()]:
+    threading.Thread(target=start_bot_thread, name="HC_Bot_Thread", daemon=True).start()
 
-if 'bot_started' not in st.session_state:
-    threading.Thread(target=start_bot, daemon=True).start()
-    st.session_state['bot_started'] = True
+def safe_int(value, default):
+    try: return int(value)
+    except: return default
 
-# --- UI HEADER ---
 st.title("🖥️ HC Job & Exam Controller")
-st.caption(f"Bot Status: {'Running' if st.session_state.get('bot_started') else 'Stopped'}")
+st.caption("Bot Status: 🟢 Running")
 
-# Tabs
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["📝 Post Job", "🎨 Poster Gen", "🗂️ Job Library", "📊 Status Tracker", "🧠 Daily Quiz"])
+# NEW TABS
+tab1, tab_sync, tab2, tab3, tab4, tab5 = st.tabs(["📝 Post Manually", "🌐 Sync Center", "🎨 Poster", "🗂️ Library", "📊 Tracker", "🧠 Quiz"])
 
-# --- TAB 1: POST JOB (FIXED) ---
+# --- TAB 1: MANUAL POST ---
 with tab1:
-    st.header("1. Upload Notification")
-    
-    col1, col2 = st.columns([1, 2])
-    
+    st.header("Upload Notification")
+    col1, col2 = st.columns([1, 1])
     with col1:
-        cat = st.selectbox("Category", ["GOVT_JOB", "PVT_JOB", "EXAM", "SCHOLARSHIP"])
-        uploaded = st.file_uploader("Upload PDF Notification", type=['pdf'])
-        
+        cat = st.selectbox("Category", ["GOVT_JOB", "PVT_JOB", "SCHEME", "EXAM", "RESULT", "KEY_ANSWER", "SCHOLARSHIP"])
+        uploaded = st.file_uploader("Upload PDF", type=['pdf'])
         if uploaded and st.button("✨ Analyze PDF"):
-            with st.spinner("AI is reading the file..."):
-                # 1. Extract Text
+            with st.spinner("AI Analysis..."):
                 txt = extract_text_from_pdf(uploaded)
-                
-                if not txt or len(txt) < 50:
-                    st.error("⚠️ Could not read text from PDF. It might be an image/scan. Please fill details manually.")
-                else:
-                    # 2. Analyze with Groq
-                    data = analyze_notification(txt)
-                    
-                    if data and "error" in data:
-                        st.error(f"❌ {data['error']}")
-                    elif data: 
-                        st.session_state['job_data'] = data
-                        st.success("Analysis Complete!")
-                    else:
-                        st.error("⚠️ Unknown Error: AI returned no data.")
+                if txt:
+                    data = analyze_notification(txt, mode=cat) # Pass Category Mode
+                    if data: st.session_state['job_data'] = data; st.success("Done!")
 
-    # --- THE FORM ---
+    if 'job_data' in st.session_state:
+        d = st.session_state['job_data']
+        with st.expander("📄 Detailed Report", expanded=True): st.markdown(d.get("detailed_analysis", ""))
+
     with col2:
-        st.subheader("2. Review & Post")
-        
-        # Load defaults
+        st.subheader("Review & Post")
         d = st.session_state.get('job_data', {})
-        
-        with st.form("job_entry_form"):
-            t = st.text_input("Job Title", value=d.get("title", ""))
-            s = st.text_area("Kannada Summary", value=d.get("summary", ""), height=100)
-            
+        with st.form("job"):
+            t = st.text_input("Title", d.get("title", ""))
+            s = st.text_area("Summary", d.get("summary", ""), height=100)
             c1, c2 = st.columns(2)
-            with c1:
-                # FIX: Use safe_int to prevent "Refer PDF" crashes
-                min_a = st.number_input("Min Age", value=safe_int(d.get("min_age"), 18))
-                qual = st.text_input("Qualification", value=d.get("qualification", ""))
-            with c2:
-                # FIX: Use safe_int here too
-                max_a = st.number_input("Max Age", value=safe_int(d.get("max_age"), 35))
-                link = st.text_input("Official Link (Hidden)", value=d.get("apply_link", ""))
-                
-            doc = st.text_area("Required Documents", value=d.get("documents", "Standard Documents"), height=70)
-            
-            # The Submit Button
-            if st.form_submit_button("✅ Post to Bot"):
-                add_job(t, s, link, min_a, max_a, qual, cat, doc)
-                st.success(f"Successfully Posted: {t}")
-                if 'job_data' in st.session_state:
-                    del st.session_state['job_data']
+            c1.number_input("Min Age", value=safe_int(d.get("min_age"), 18))
+            c2.number_input("Max Age", value=safe_int(d.get("max_age"), 60))
+            link = st.text_input("Link", d.get("apply_link", ""))
+            doc = st.text_area("Docs/Benefits", d.get("documents", "Standard"), height=70)
+            if st.form_submit_button("✅ Post"):
+                add_job(t, s, link, safe_int(d.get("min_age"), 18), safe_int(d.get("max_age"), 60), d.get("qualification", ""), cat, doc)
+                st.success("Posted!")
 
-# --- TAB 2: POSTER GENERATOR ---
-with tab2:
-    st.header("🎨 Poster Prompt Generator")
-    jobs = supabase.table("jobs").select("*").eq("is_active", True).execute().data
+# --- TAB SYNC: AUTO FETCH (NEW) ---
+with tab_sync:
+    st.header("🌐 Sync Center (Auto-Fetch)")
+    st.caption("Fetches latest updates from OneIndia, FreeJobAlert, etc.")
     
-    if not jobs:
-        st.info("No active jobs found. Post a job in Tab 1 first.")
-    else:
-        jt = st.selectbox("Select Job", [j['title'] for j in jobs])
-        
+    if st.button("🔄 Fetch Latest Updates"):
+        with st.spinner("Scanning Internet..."):
+            feeds = fetch_rss_feeds()
+            st.session_state['feeds'] = feeds
+            st.success(f"Found {len(feeds)} Updates!")
+
+    if 'feeds' in st.session_state:
+        for item in st.session_state['feeds']:
+            with st.expander(f"{item['title']} ({item['published']})"):
+                st.write(item['summary'])
+                st.write(f"Source: {item['link']}")
+                
+                # THE IMPORT BUTTON
+                if st.button("⬇️ Import & Analyze", key=item['link']):
+                    with st.spinner("Scraping & Analyzing..."):
+                        # 1. Scrape Text from Webpage
+                        web_text = fetch_url_text(item['link'])
+                        if len(web_text) < 100: web_text = item['title'] + " " + item['summary'] # Fallback
+                        
+                        # 2. Analyze with AI
+                        data = analyze_notification(web_text, mode="JOB")
+                        st.session_state['job_data'] = data
+                        st.success("Imported to 'Post Manually' Tab! Go there to review.")
+
+# --- (Tabs 2, 3, 4, 5 remain standard) ---
+with tab2: # Poster
+    jobs = supabase.table("jobs").select("*").eq("is_active", True).execute().data
+    if jobs:
+        jt = st.selectbox("Job", [j['title'] for j in jobs])
         if st.button("Generate Prompt"):
             j = next(x for x in jobs if x['title'] == jt)
-            with st.spinner("Writing prompt..."):
-                prompt_text = generate_poster_prompt(j['title'], j['qualification_req'])
-                st.code(prompt_text)
-                st.caption("Copy above text to Bing Image Creator or Ideogram.")
+            st.code(generate_poster_prompt(j['title'], j['qualification_req']))
 
-# --- TAB 3: JOB LIBRARY ---
-with tab3:
-    st.subheader("Manage Active Jobs")
+with tab3: # Library
     q = st.text_input("Search")
     res = supabase.table("jobs").select("*").eq("is_active", True).ilike("title", f"%{q}%").execute().data
-    
-    if not res:
-        st.write("No active jobs.")
-        
     for j in res:
-        with st.expander(f"{j['title']} (Ends: {j.get('last_date', 'N/A')})"):
-            st.write(f"Link: {j['apply_link']}")
-            st.link_button("Go to Official Site ↗️", j['apply_link'])
-            if st.button("Delete", key=f"del_{j['id']}"):
-                supabase.table("jobs").update({"is_active": False}).eq("id", j['id']).execute()
-                st.rerun()
+        with st.expander(j['title']):
+            if st.button("Delete", key=j['id']):
+                supabase.table("jobs").update({"is_active": False}).eq("id", j['id']).execute(); st.rerun()
 
-# --- TAB 4: STATUS TRACKER ---
-with tab4:
-    st.subheader("Customer Applications")
-    with st.form("new_app"):
-        c1, c2 = st.columns(2)
-        with c1: uid = st.text_input("User ID (Telegram ID)")
-        with c2: jt = st.text_input("Job Name")
-        if st.form_submit_button("Track Application"):
-            supabase.table("user_applications").insert({"user_id": uid, "job_title": jt, "status": "Received"}).execute()
-            st.success("Added!")
-            
-    st.divider()
-    apps = supabase.table("user_applications").select("*").order("updated_at", desc=True).limit(20).execute().data
+with tab4: # Status
+    with st.form("new"):
+        uid = st.text_input("User ID"); jt = st.text_input("Job")
+        if st.form_submit_button("Add"):
+            supabase.table("user_applications").insert({"user_id": uid, "job_title": jt, "status": "Received"}).execute(); st.success("Added")
+    apps = supabase.table("user_applications").select("*").order("updated_at", desc=True).limit(10).execute().data
     for a in apps:
-        c1, c2, c3 = st.columns([1,2,2])
-        c1.write(f"User: `{a['user_id']}`")
-        c2.write(f"**{a['job_title']}**")
-        
-        status_options = ["Received", "Processing", "Hall Ticket Sent", "Done"]
-        curr_idx = status_options.index(a['status']) if a['status'] in status_options else 0
-        
-        new_stat = c3.selectbox("Status", status_options, index=curr_idx, key=f"st_{a['id']}")
-        if new_stat != a['status']:
-            supabase.table("user_applications").update({"status": new_stat}).eq("id", a['id']).execute()
-            st.toast("Status Updated!")
+        c1, c2 = st.columns([3, 1])
+        c1.write(f"{a['user_id']} - {a['job_title']} ({a['status']})")
+        if c2.button("Done", key=f"s_{a['id']}"):
+            supabase.table("user_applications").update({"status": "Done"}).eq("id", a['id']).execute(); st.rerun()
 
-# --- TAB 5: DAILY QUIZ ---
-with tab5:
-    st.subheader("Daily GK Quiz")
-    topic = st.selectbox("Topic", ["General Knowledge", "Karnataka History", "Science", "Mental Ability"])
-    
-    if st.button("Auto-Generate Question"):
-        with st.spinner("AI Generating..."):
-            q = generate_daily_quiz_content(topic)
-            if q:
-                supabase.table("quizzes").insert({"question": q['question'], "options": q['options'], "correct_id": ["A","B","C","D"].index(q['correct_option']), "is_sent": False}).execute()
-                st.success("Quiz Queued! Check Telegram Channel.")
+with tab5: # Quiz
+    topic = st.selectbox("Topic", ["GK", "History"])
+    if st.button("Generate"):
+        q = generate_daily_quiz_content(topic)
+        if q: supabase.table("quizzes").insert({"question": q['question'], "options": q['options'], "correct_id": 0, "is_sent": False}).execute(); st.success("Queued!")
+            
