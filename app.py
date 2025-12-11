@@ -299,3 +299,30 @@ elif menu == "🎨 Tools (Poster/Quiz)":
                         "is_sent": False
                     }).execute()
                     st.success("Quiz Queued for Broadcast!")
+
+# Add New
+    with st.expander("➕ Add New Customer Order", expanded=True):
+        with st.form("new_app"):
+            c1, c2 = st.columns(2)
+            uid = c1.text_input("User ID (Telegram)")
+            jt = c2.text_input("Job/Service Name")
+            
+            if st.form_submit_button("Add to Tracker"):
+                # VALIDATION CHECK
+                if not uid or not uid.isdigit():
+                    st.error("⚠️ User ID must be a number (e.g. 12345678).")
+                elif not jt:
+                    st.error("⚠️ Job Name cannot be empty.")
+                else:
+                    # Only submit if valid
+                    try:
+                        supabase.table("user_applications").insert({
+                            "user_id": int(uid), # Convert to number
+                            "job_title": jt, 
+                            "status": "Received"
+                        }).execute()
+                        st.success("Added!")
+                        time.sleep(1)
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Database Error: {e}")
