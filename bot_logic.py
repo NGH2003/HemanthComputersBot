@@ -6,7 +6,7 @@ from telegram.ext import Application, CommandHandler, ContextTypes, CallbackQuer
 from db import add_user, supabase, get_whatsapp_number
 
 TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
-CHANNEL_ID = "@YOUR_CHANNEL_USERNAME_HERE" # <--- ADD YOUR CHANNEL ID (e.g. @HC_Jobs)
+CHANNEL_ID = "@hc_notifications" # <--- ADD YOUR CHANNEL ID (e.g. @HC_Jobs)
 
 # --- 1. START MENU & REGISTRATION ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -14,7 +14,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     res = supabase.table("users").select("*").eq("user_id", user.id).execute()
     
     wa_num = get_whatsapp_number()
-    tg_user = os.environ.get("ADMIN_TELEGRAM_USERNAME", "HemanthComputers")
+    tg_user = os.environ.get("ADMIN_TELEGRAM_USERNAME", "hemanthcomputers")
 
     if res.data:
         u = res.data[0]
@@ -128,3 +128,4 @@ async def run_bot():
     await app.start()
     await app.updater.start_polling()
     while True: await asyncio.sleep(3600)
+
