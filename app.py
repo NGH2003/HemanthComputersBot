@@ -11,6 +11,127 @@ from bot_logic import run_bot
 # --- CONFIG ---
 st.set_page_config(page_title="HC Admin Pro", layout="wide", page_icon="🖥️")
 
+# ... (Your imports remain here) ...
+
+st.set_page_config(page_title="HC Admin Pro", layout="wide", page_icon="🖥️")
+
+# --- 🎨 CUSTOM CSS & HTML INJECTION ---
+st.markdown("""
+<style>
+    /* 1. GLOBAL SETTINGS */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap');
+    
+    html, body, [class*="css"] {
+        font-family: 'Inter', sans-serif;
+        background-color: #f8f9fa; /* Light Gray Background */
+        color: #1e1e1e;
+    }
+
+    /* 2. SIDEBAR STYLING */
+    section[data-testid="stSidebar"] {
+        background-color: #0e1117; /* Dark Sidebar */
+        color: white;
+    }
+    section[data-testid="stSidebar"] .css-17lntkn {
+        color: #e0e0e0;
+    }
+    
+    /* 3. METRIC CARDS (Dashboard Stats) */
+    div[data-testid="metric-container"] {
+        background-color: #ffffff;
+        border: 1px solid #e0e0e0;
+        padding: 20px;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        color: #333;
+        transition: transform 0.2s;
+    }
+    div[data-testid="metric-container"]:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 12px rgba(0,0,0,0.1);
+    }
+    div[data-testid="metric-container"] label {
+        color: #666; /* Label Color */
+    }
+    div[data-testid="metric-container"] div[data-testid="stMetricValue"] {
+        color: #007bff; /* Value Color (Blue) */
+        font-weight: 700;
+    }
+
+    /* 4. BUTTONS */
+    .stButton>button {
+        background-color: #007bff;
+        color: white;
+        border-radius: 8px;
+        border: none;
+        padding: 10px 24px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
+    .stButton>button:hover {
+        background-color: #0056b3;
+        color: white;
+        box-shadow: 0 4px 10px rgba(0,123,255,0.3);
+    }
+    
+    /* Secondary Button (Red/Delete) Override - simplified selector */
+    div[data-testid="stExpander"] button {
+        background-color: #ff4b4b;
+        border: 1px solid #ff4b4b;
+    }
+    div[data-testid="stExpander"] button:hover {
+        background-color: #c93434;
+    }
+
+    /* 5. FORM INPUTS */
+    input[type="text"], textarea, input[type="number"] {
+        border-radius: 8px !important;
+        border: 1px solid #d1d5db !important;
+        padding: 10px;
+    }
+    
+    /* 6. TABS */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+    }
+    .stTabs [data-baseweb="tab"] {
+        height: 50px;
+        white-space: pre-wrap;
+        background-color: white;
+        border-radius: 8px 8px 0 0;
+        gap: 1px;
+        padding: 10px 20px;
+        border: 1px solid #e0e0e0;
+        border-bottom: none;
+    }
+    .stTabs [aria-selected="true"] {
+        background-color: #007bff !important;
+        color: white !important;
+    }
+
+    /* 7. HIDE STREAMLIT BRANDING */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    
+</style>
+""", unsafe_allow_html=True)
+
+# --- CUSTOM HEADER HTML ---
+st.markdown("""
+<div style="background-color: #007bff; padding: 20px; border-radius: 10px; margin-bottom: 20px; color: white; display: flex; align-items: center; justify-content: space-between;">
+    <div>
+        <h1 style="margin: 0; font-size: 24px; color: white;">🖥️ Hemanth Computers</h1>
+        <p style="margin: 0; font-size: 14px; opacity: 0.8;">Admin Control Center • Active</p>
+    </div>
+    <div style="background: rgba(255,255,255,0.2); padding: 5px 15px; border-radius: 20px; font-size: 12px;">
+        Ver 2.0
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+# ... (Rest of your app.py logic follows from here: imports, sidebar, tabs...)
+
 # --- CUSTOM CSS FOR UI POLISH ---
 st.markdown("""
 <style>
