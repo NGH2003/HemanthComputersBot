@@ -8,6 +8,14 @@ from bot_logic import run_bot
 
 st.set_page_config(page_title="HC Admin", layout="wide")
 
+# --- HELPER: SAFE INTEGER CONVERTER (Prevents Crashes) ---
+def safe_int(value, default):
+    """Tries to convert text to a number. If it fails (e.g., 'Refer PDF'), returns default."""
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        return default
+
 # --- BOT BACKGROUND RUNNER ---
 def start_bot():
     loop = asyncio.new_event_loop()
@@ -40,11 +48,10 @@ with tab1:
                 # 1. Extract Text
                 txt = extract_text_from_pdf(uploaded)
                 
-                # Debug: Check if PDF was read
                 if not txt or len(txt) < 50:
                     st.error("⚠️ Could not read text from PDF. It might be an image/scan. Please fill details manually.")
                 else:
-                   # 2. Analyze with Groq
+                    # 2. Analyze with Groq
                     data = analyze_notification(txt)
                     
                     if data and "error" in data:
@@ -55,11 +62,11 @@ with tab1:
                     else:
                         st.error("⚠️ Unknown Error: AI returned no data.")
 
-    # --- THE FORM (Now Outside the logic, so it always shows) ---
+    # --- THE FORM ---
     with col2:
         st.subheader("2. Review & Post")
         
-        # Load defaults from AI if available, else empty
+        # Load defaults
         d = st.session_state.get('job_data', {})
         
         with st.form("job_entry_form"):
@@ -68,18 +75,20 @@ with tab1:
             
             c1, c2 = st.columns(2)
             with c1:
-                min_a = st.number_input("Min Age", value=int(d.get("min_age", 18)))
+                # FIX: Use safe_int to prevent "Refer PDF" crashes
+                min_a = st.number_input("Min Age", value=safe_int(d.get("min_age"), 18))
                 qual = st.text_input("Qualification", value=d.get("qualification", ""))
             with c2:
-                max_a = st.number_input("Max Age", value=int(d.get("max_age", 35)))
+                # FIX: Use safe_int here too
+                max_a = st.number_input("Max Age", value=safe_int(d.get("max_age"), 35))
                 link = st.text_input("Official Link (Hidden)", value=d.get("apply_link", ""))
                 
             doc = st.text_area("Required Documents", value=d.get("documents", "Standard Documents"), height=70)
             
+            # The Submit Button
             if st.form_submit_button("✅ Post to Bot"):
                 add_job(t, s, link, min_a, max_a, qual, cat, doc)
                 st.success(f"Successfully Posted: {t}")
-                # Clear session to prevent duplicate posts
                 if 'job_data' in st.session_state:
                     del st.session_state['job_data']
 
