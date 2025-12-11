@@ -31,3 +31,15 @@ def add_job(title, summary, link, min_age, max_age, qual, category, documents):
         "category": category, "documents_req": documents, "is_active": True
     }
     supabase.table("jobs").insert(data).execute()
+
+# ... existing code ...
+
+# ADD THIS FUNCTION TO db.py
+def update_job(job_id, title, summary, link, min_age, max_age, qual, category, documents):
+    """Updates an existing job entry"""
+    data = {
+        "title": title, "summary": summary, "apply_link": link,
+        "min_age": min_age, "max_age": max_age, "qualification_req": qual,
+        "category": category, "documents_req": documents
+    }
+    supabase.table("jobs").update(data).eq("id", job_id).execute()
