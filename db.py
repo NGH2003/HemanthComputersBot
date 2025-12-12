@@ -14,7 +14,6 @@ def get_whatsapp_number():
     except: return "919900000000"
 
 def add_user(user_id, first_name, username, qual, age, caste, gender):
-    # Check if user exists to award daily login coins
     today = str(date.today())
     res = supabase.table("users").select("coins, last_daily_login").eq("user_id", user_id).execute()
     
@@ -37,6 +36,16 @@ def add_user(user_id, first_name, username, qual, age, caste, gender):
         supabase.table("users").upsert(data).execute()
     return coins
 
+def update_user_coins(user_id, amount):
+    """Manually add/remove coins. amount can be negative."""
+    res = supabase.table("users").select("coins").eq("user_id", user_id).execute()
+    if res.data:
+        current = res.data[0]['coins']
+        new_bal = max(0, current + int(amount))
+        supabase.table("users").update({"coins": new_bal}).eq("user_id", user_id).execute()
+        return new_bal
+    return 0
+
 def update_user_profile(user_id, field, value):
     supabase.table("users").update({field: value}).eq("user_id", user_id).execute()
 
@@ -53,16 +62,11 @@ def update_job(job_id, title, summary, link, min_age, max_age, qual, category, d
     supabase.table("jobs").update(data).eq("id", job_id).execute()
 
 def set_reminder(user_id, job_id, last_date_str):
-    """Sets a reminder 2 days before deadline"""
     try:
-        # Parse date and subtract 2 days
-        y, m, d = map(int, last_date_str.split('-')) # Assumes YYYY-MM-DD
+        y, m, d = map(int, last_date_str.split('-'))
         deadline = date(y, m, d)
         remind_on = deadline - timedelta(days=2)
-        
-        supabase.table("job_reminders").insert({
-            "user_id": user_id, "job_id": job_id, "reminder_date": str(remind_on)
-        }).execute()
+        supabase.table("job_reminders").insert({"user_id": user_id, "job_id": job_id, "reminder_date": str(remind_on)}).execute()
         return True
     except: return False
 
@@ -70,5 +74,8 @@ def set_reminder(user_id, job_id, last_date_str):
 def get_user_docs(user_id):
     return supabase.table("user_docs").select("*").eq("user_id", user_id).execute().data
 
-def add_user_doc(user_id, doc_name, expiry):
-    supabase.table("user_docs").insert({"user_id": user_id, "doc_name": doc_name, "expiry_date": expiry}).execute()
+def add_user_doc(user_id, doc_name, expiry, file_id):
+    supabase.table("user_docs").insert({
+        "user_id": user_id, "doc_name": doc_name, "expiry_date": expiry, 
+        "file_id": file_id, "status": "Valid"
+    }).execute()
