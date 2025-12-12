@@ -70,6 +70,10 @@ def set_reminder(user_id, job_id, last_date_str):
         return True
     except: return False
 
+# --- QUIZ HELPERS ---
+def update_quiz_poll_id(quiz_id, poll_id):
+    supabase.table("quizzes").update({"poll_id": poll_id, "is_sent": True}).eq("id", quiz_id).execute()
+
 # --- DOCS ---
 def get_user_docs(user_id):
     return supabase.table("user_docs").select("*").eq("user_id", user_id).execute().data
