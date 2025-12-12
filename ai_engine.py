@@ -9,39 +9,41 @@ from groq import Groq
 client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 MODEL_NAME = "llama-3.3-70b-versatile"
 
-# --- WEB TOOLS ---
-def fetch_rss_feeds():
-    """Pulls latest updates from trusted sources"""
-    feeds = [
-        "https://kannada.oneindia.com/rss/feeds/kannada-jobs-fb.xml",
-        "https://www.freejobalert.com/feed",
-        "https://kannada.news18.com/commonfeeds/v1/kannada/rss/career.xml"
-    ]
+# --- VOICE SEARCH (New) ---
+def transcribe_audio(audio_bytes):
+    """Uses Groq Whisper to transcribe Kannada/English audio"""
+    try:
+        # Groq's transcription API
+        transcription = client.audio.transcriptions.create(
+            file=("voice.mp3", audio_bytes), # Groq handles raw bytes if named correctly
+            model="whisper-large-v3",
+            response_format="json",
+            language="en" # Or auto-detect
+        )
+        return transcription.text
+    except Exception as e:
+        print(f"Audio Error: {e}")
+        return ""
+
+# --- (Keep existing functions: fetch_rss_feeds, fetch_url_text, extract_text_from_pdf, analyze_notification, generate_daily_quiz_content, generate_poster_prompt) ---
+# ... [PASTE YOUR EXISTING AI FUNCTIONS HERE] ...
+def fetch_rss_feeds(feed_urls):
     found_items = []
-    for url in feeds:
+    for url in feed_urls:
         try:
             f = feedparser.parse(url)
             for entry in f.entries[:5]: 
-                found_items.append({
-                    "title": entry.title,
-                    "link": entry.link,
-                    "summary": getattr(entry, 'summary', 'No summary'),
-                    "published": getattr(entry, 'published', 'Today')
-                })
+                found_items.append({"title": entry.title, "link": entry.link, "summary": getattr(entry, 'summary', 'No summary'), "published": getattr(entry, 'published', 'Today')})
         except: continue
     return found_items
 
 def fetch_url_text(url):
-    """Scrapes text from a website link"""
     try:
         headers = {'User-Agent': 'Mozilla/5.0'}
         resp = requests.get(url, headers=headers, timeout=10)
         soup = BeautifulSoup(resp.content, 'html.parser')
         for script in soup(["script", "style"]): script.extract()
-        text = soup.get_text()
-        lines = (line.strip() for line in text.splitlines())
-        text = '\n'.join(chunk for line in lines for chunk in line.split("  ") if chunk)
-        return text[:10000] 
+        return soup.get_text()[:10000] 
     except: return ""
 
 def extract_text_from_pdf(pdf_file):
@@ -54,57 +56,24 @@ def extract_text_from_pdf(pdf_file):
         return text
     except: return ""
 
-# --- AI ANALYSIS ---
 def analyze_notification(raw_text, mode="JOB"):
     api_key = os.environ.get("GROQ_API_KEY")
-    if not api_key: return {"error": "CRITICAL: GROQ_API_KEY is missing."}
-
-    if mode == "SCHEME":
-        focus = "Extract 'Benefits' (e.g. Rs 2000) and 'Beneficiaries' (e.g. Women)."
-    elif mode in ["RESULT", "KEY_ANSWER"]:
-        focus = "Extract Exam Name and Result Link."
-    else:
-        focus = "Extract Job Title, Age, Qualification, Documents."
-
-    prompt = f"""
-    Analyze this text and return JSON ONLY.
-    Context: {focus}
-    
-    PART 2: DETAILED ANALYTICS (Markdown Report)
-    Generate a professional "Detailed Report" (Markdown) covering Highlights, Eligibility, Dates, Fees.
-    
-    Structure:
-    {{
-        "title": "Title", 
-        "summary": "Short Kanglish summary", 
-        "min_age": 18, "max_age": 60,
-        "qualification": "Eligibility", 
-        "last_date": "DD/MM/YYYY", 
-        "apply_link": "URL",
-        "documents": "List of docs...",
-        "detailed_analysis": "Markdown report..."
-    }}
-    Text: {raw_text[:8000]} 
-    """
+    prompt = f"Analyze this text ({mode}) and return JSON: title, summary, min_age, max_age, qualification, last_date (YYYY-MM-DD), apply_link, documents. Text: {raw_text[:8000]}"
     try:
-        chat = client.chat.completions.create(
-            messages=[{"role": "user", "content": prompt}],
-            model=MODEL_NAME, response_format={"type": "json_object"}
-        )
+        chat = client.chat.completions.create(messages=[{"role": "user", "content": prompt}], model=MODEL_NAME, response_format={"type": "json_object"})
         return json.loads(chat.choices[0].message.content)
-    except Exception as e: return {"error": f"Groq API Failed: {str(e)}"}
+    except: return {}
 
 def generate_daily_quiz_content(topic):
-    prompt = f"""Generate 1 GK multiple-choice question on {topic}. Return JSON: {{ "question": "...", "options": ["A", "B", "C", "D"], "correct_option": "A" }}"""
+    prompt = f"Generate 1 GK multiple-choice question on {topic}. Return JSON: {{ 'question': '...', 'options': ['A', 'B', 'C', 'D'], 'correct_option': 'A' }}"
     try:
         chat = client.chat.completions.create(messages=[{"role": "user", "content": prompt}], model=MODEL_NAME, response_format={"type": "json_object"})
         return json.loads(chat.choices[0].message.content)
     except: return None
 
 def generate_poster_prompt(job_title, qualification):
-    prompt = f"""Write a text-to-image prompt for a poster: "{job_title}". Qual: {qualification}. Style: Gold/Black, Professional. Output ONLY prompt."""
+    prompt = f"Write a text-to-image prompt for a poster: '{job_title}'. Qual: {qualification}. Style: Gold/Black, Professional."
     try:
         chat = client.chat.completions.create(messages=[{"role": "user", "content": prompt}], model=MODEL_NAME)
         return chat.choices[0].message.content
-    except: return "Error generating prompt."
-    
+    except: return "Error"
