@@ -9,24 +9,17 @@ from groq import Groq
 client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 MODEL_NAME = "llama-3.3-70b-versatile"
 
-# --- VOICE SEARCH (New) ---
 def transcribe_audio(audio_bytes):
-    """Uses Groq Whisper to transcribe Kannada/English audio"""
     try:
-        # Groq's transcription API
         transcription = client.audio.transcriptions.create(
-            file=("voice.mp3", audio_bytes), # Groq handles raw bytes if named correctly
+            file=("voice.mp3", audio_bytes),
             model="whisper-large-v3",
             response_format="json",
-            language="en" # Or auto-detect
+            language="en"
         )
         return transcription.text
-    except Exception as e:
-        print(f"Audio Error: {e}")
-        return ""
+    except Exception as e: return ""
 
-# --- (Keep existing functions: fetch_rss_feeds, fetch_url_text, extract_text_from_pdf, analyze_notification, generate_daily_quiz_content, generate_poster_prompt) ---
-# ... [PASTE YOUR EXISTING AI FUNCTIONS HERE] ...
 def fetch_rss_feeds(feed_urls):
     found_items = []
     for url in feed_urls:
@@ -57,7 +50,6 @@ def extract_text_from_pdf(pdf_file):
     except: return ""
 
 def analyze_notification(raw_text, mode="JOB"):
-    api_key = os.environ.get("GROQ_API_KEY")
     prompt = f"Analyze this text ({mode}) and return JSON: title, summary, min_age, max_age, qualification, last_date (YYYY-MM-DD), apply_link, documents. Text: {raw_text[:8000]}"
     try:
         chat = client.chat.completions.create(messages=[{"role": "user", "content": prompt}], model=MODEL_NAME, response_format={"type": "json_object"})
@@ -72,8 +64,9 @@ def generate_daily_quiz_content(topic):
     except: return None
 
 def generate_poster_prompt(job_title, qualification):
+    # Fixed logic to ensure string return
     prompt = f"Write a text-to-image prompt for a poster: '{job_title}'. Qual: {qualification}. Style: Gold/Black, Professional."
     try:
         chat = client.chat.completions.create(messages=[{"role": "user", "content": prompt}], model=MODEL_NAME)
         return chat.choices[0].message.content
-    except: return "Error"
+    except Exception as e: return f"Error generating prompt: {e}"
