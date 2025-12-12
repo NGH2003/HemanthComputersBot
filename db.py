@@ -1,7 +1,6 @@
 import os
 from supabase import create_client, Client
 
-# Load keys from Environment Variables
 url: str = os.environ.get("SUPABASE_URL")
 key: str = os.environ.get("SUPABASE_KEY")
 
@@ -21,6 +20,11 @@ def add_user(user_id, first_name, username, qual, age, caste, gender):
     }
     supabase.table("users").upsert(data).execute()
 
+# --- NEW: UPDATE PROFILE ---
+def update_user_profile(user_id, field, value):
+    """Updates a single field (like age or qual) for a user"""
+    supabase.table("users").update({field: value}).eq("user_id", user_id).execute()
+
 def add_job(title, summary, link, min_age, max_age, qual, category, documents):
     data = {
         "title": title, "summary": summary, "apply_link": link,
@@ -36,3 +40,4 @@ def update_job(job_id, title, summary, link, min_age, max_age, qual, category, d
         "category": category, "documents_req": documents
     }
     supabase.table("jobs").update(data).eq("id", job_id).execute()
+    
