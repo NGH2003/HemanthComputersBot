@@ -189,3 +189,4 @@ async def run_bot():
     
     await app.initialize(); await app.start(); await app.updater.start_polling()
     while True: await asyncio.sleep(3600)
+
