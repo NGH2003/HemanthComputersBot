@@ -6,7 +6,7 @@ from telegram.ext import Application, CommandHandler, ContextTypes, CallbackQuer
 from db import add_user, update_user_profile, delete_user_profile, supabase, get_whatsapp_number
 
 TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
-CHANNEL_ID = "@HC_Job_Alerts" 
+CHANNEL_ID = "@hc_notifications" 
 
 # --- 1. SMART START COMMAND ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -250,3 +250,4 @@ async def run_bot():
     
     await app.initialize(); await app.start(); await app.updater.start_polling()
     while True: await asyncio.sleep(3600)
+
