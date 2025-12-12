@@ -20,10 +20,12 @@ def add_user(user_id, first_name, username, qual, age, caste, gender):
     }
     supabase.table("users").upsert(data).execute()
 
-# --- NEW: UPDATE PROFILE ---
 def update_user_profile(user_id, field, value):
-    """Updates a single field (like age or qual) for a user"""
     supabase.table("users").update({field: value}).eq("user_id", user_id).execute()
+
+def delete_user_profile(user_id):
+    """Deletes a user from the database"""
+    supabase.table("users").delete().eq("user_id", user_id).execute()
 
 def add_job(title, summary, link, min_age, max_age, qual, category, documents):
     data = {
@@ -40,4 +42,3 @@ def update_job(job_id, title, summary, link, min_age, max_age, qual, category, d
         "category": category, "documents_req": documents
     }
     supabase.table("jobs").update(data).eq("id", job_id).execute()
-    
