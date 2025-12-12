@@ -10,6 +10,29 @@ from bot_logic import run_bot
 # --- CONFIG ---
 st.set_page_config(page_title="HC Citizen Admin", layout="wide", page_icon="🏛️")
 
+import streamlit as st
+# ... other imports ...
+
+# 1. CONFIG
+st.set_page_config(page_title="HC Citizen Admin", layout="wide", page_icon="🏛️")
+
+# 2. PASTE YOUR CSS HERE
+st.markdown("""
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap');
+    html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
+    [data-testid="stSidebar"] { background-color: #0e1117; }
+    [data-testid="stSidebar"] * { color: #ffffff !important; }
+    div[data-testid="metric-container"] { background-color: #ffffff; border: 1px solid #e0e0e0; padding: 15px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+    .stButton>button { border-radius: 8px; font-weight: 600; }
+    #MainMenu {visibility: hidden;} footer {visibility: hidden;}
+</style>
+""", unsafe_allow_html=True)
+
+# 3. REST OF THE APP
+# ... start_bot_thread() ...
+
+
 # --- CSS INJECTION (Dark Sidebar, Clean UI) ---
 st.markdown("""
 <style>
