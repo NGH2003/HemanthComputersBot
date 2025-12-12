@@ -1,8 +1,8 @@
 import os
 import asyncio
 import urllib.parse
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup
-from telegram.ext import Application, CommandHandler, ContextTypes, CallbackQueryHandler, MessageHandler, filters
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Application, CommandHandler, ContextTypes, CallbackQueryHandler
 from db import add_user, update_user_profile, supabase, get_whatsapp_number
 
 TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
@@ -116,15 +116,18 @@ async def edit_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def set_field_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handles /set_age 25 or /set_qual Degree"""
     text = update.message.text # e.g. /set_age 25
-    cmd, val = text.split(" ", 1)
-    
-    user_id = update.effective_user.id
-    if "age" in cmd:
-        update_user_profile(user_id, "age", int(val))
-        await update.message.reply_text("✅ Age Updated!")
-    elif "qual" in cmd:
-        update_user_profile(user_id, "qualification", val)
-        await update.message.reply_text("✅ Qualification Updated!")
+    try:
+        cmd, val = text.split(" ", 1)
+        user_id = update.effective_user.id
+        
+        if "age" in cmd:
+            update_user_profile(user_id, "age", int(val))
+            await update.message.reply_text("✅ Age Updated!")
+        elif "qual" in cmd:
+            update_user_profile(user_id, "qualification", val)
+            await update.message.reply_text("✅ Qualification Updated!")
+    except:
+        await update.message.reply_text("⚠️ Error. Use format: `/set_age 25`")
 
 # --- 3. SUGGESTIONS (With Schemes Logic) ---
 async def suggest_opportunities(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -146,7 +149,7 @@ async def suggest_opportunities(update: Update, context: ContextTypes.DEFAULT_TY
         
         # Scheme Matching
         if item['category'] == 'SCHEME':
-            if "women" in i_qual and "female" not in u_gender: continue
+            if "women" in i_qual and "male" not in u_gender: continue
             if ("sc" in i_qual or "st" in i_qual) and ("sc" not in u_caste and "st" not in u_caste): continue
             matched.append(item)
         else:
@@ -157,8 +160,11 @@ async def suggest_opportunities(update: Update, context: ContextTypes.DEFAULT_TY
     admin_phone = get_whatsapp_number()
     await query.message.reply_text(f"🎯 **Found {len(matched)} Matches!**", parse_mode='Markdown')
     for item in matched:
-        text_msg = f"👋 Hello HC, apply for *{item['title']}* (Matched)."
-        wa_link = f"https://wa.me/{admin_phone}?text={urllib.parse.quote(text_msg)}"
+        # SAFE STRING FORMATTING
+        msg_text = f"Hello HC, apply for {item['title']} (Matched)."
+        encoded_msg = urllib.parse.quote(msg_text)
+        wa_link = f"https://wa.me/{admin_phone}?text={encoded_msg}"
+        
         caption = f"✅ *{item['title']}*\n🎓 {item.get('qualification_req')}\n📅 Ends: {item.get('last_date')}"
         kb = [[InlineKeyboardButton("🤖 Info", callback_data=f"summary_{item['id']}"), InlineKeyboardButton("✅ Apply", url=wa_link)]]
         await query.message.reply_text(caption, parse_mode='Markdown', reply_markup=InlineKeyboardMarkup(kb))
@@ -172,7 +178,11 @@ async def show_listings(update: Update, category):
     
     admin_phone = get_whatsapp_number()
     for item in items:
-        wa_link = f"https://wa.me/{admin_phone}?text={urllib.parse.quote(f'Details for {item['title']}')}"
+        # SAFE STRING FORMATTING (Fixed Error Here)
+        msg_text = f"Details for {item['title']}"
+        encoded_msg = urllib.parse.quote(msg_text)
+        wa_link = f"https://wa.me/{admin_phone}?text={encoded_msg}"
+        
         caption = f"📢 *{item['title']}*\nℹ️ {item.get('summary')[:100]}..."
         kb = [[InlineKeyboardButton("🤖 Info", callback_data=f"summary_{item['id']}"), InlineKeyboardButton("✅ Contact", url=wa_link)]]
         await query.message.reply_text(caption, parse_mode='Markdown', reply_markup=InlineKeyboardMarkup(kb))
@@ -191,8 +201,12 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.reply_text(msg, parse_mode='Markdown')
     elif data.startswith("summary_"):
         job = supabase.table("jobs").select("*").eq("id", data.split("_")[1]).execute().data[0]
-        pdf_msg = f"Hello HC, send PDF for *{job['title']}*."
-        pdf_wa = f"https://wa.me/{get_whatsapp_number()}?text={urllib.parse.quote(pdf_msg)}"
+        
+        # SAFE STRING FORMATTING
+        msg_text = f"Hello HC, send PDF for {job['title']}"
+        encoded_msg = urllib.parse.quote(msg_text)
+        pdf_wa = f"https://wa.me/{get_whatsapp_number()}?text={encoded_msg}"
+        
         summary = f"🤖 **AI Summary: {job['title']}**\n\n{job['summary']}\n\n📂 **Req:** _{job.get('documents_req', '-')}_\n🔒 *Official Link hidden.*"
         kb = [[InlineKeyboardButton("📄 Request Link/PDF", url=pdf_wa)]]
         await query.message.reply_text(summary, parse_mode='Markdown', reply_markup=InlineKeyboardMarkup(kb))
@@ -219,4 +233,4 @@ async def run_bot():
     
     await app.initialize(); await app.start(); await app.updater.start_polling()
     while True: await asyncio.sleep(3600)
-    
+        
