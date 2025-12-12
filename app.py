@@ -218,4 +218,27 @@ elif menu == "🤖 Menu Config":
         c3.code(b['action_data'])
         if c4.button("🗑️", key=f"del_{b['id']}"):
             supabase.table("bot_menus").delete().eq("id", b['id']).execute(); st.rerun()
-            
+
+
+# ... (Inside app.py, under the "Tools" or "Quiz" tab) ...
+
+# NEW TAB: POLLS
+elif menu == "📊 Polls & Research":
+    st.header("🗳️ User Demand Polls")
+    
+    with st.form("poll_form"):
+        q = st.text_input("Poll Question", "What should we post next?")
+        o1 = st.text_input("Option 1", "Police Jobs")
+        o2 = st.text_input("Option 2", "KPSC Jobs")
+        o3 = st.text_input("Option 3", "Railway Jobs")
+        
+        if st.form_submit_button("📢 Broadcast Poll to Channel"):
+            # In a real app, you'd use the bot instance to send_poll
+            # Since app.py and bot_logic.py are separate, we save to DB and let bot pick it up
+            supabase.table("quizzes").insert({
+                "question": q, 
+                "options": [o1, o2, o3], 
+                "correct_id": 0, # Polls don't have correct answers usually, but reusing table
+                "is_sent": False
+            }).execute()
+            st.success("Poll Queued! (Bot will send it as a Quiz/Poll shortly)")
